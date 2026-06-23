@@ -1,14 +1,9 @@
-import { useState, useEffect, useRef } from 'react'
-import { useLocalStorage } from '../useLocalStorage'
+import { useState, useEffect } from 'react'
+import { db } from '../firebase'
+import { collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc } from 'firebase/firestore'
 import s from './Prayer.module.css'
 
 const CATS = ['전체', '가족', '직장', '교회', '전도', '감사', '치유', '기타']
-const DEFAULT_PRAYERS = [
-  { id: 1, text: '가족의 건강과 평안을 위해', cat: '가족', done: false },
-  { id: 2, text: '직장에서의 지혜와 성실함', cat: '직장', done: false },
-  { id: 3, text: '교회 공동체가 하나되길', cat: '교회', done: false },
-  { id: 4, text: '전도 대상자 김민수 구원', cat: '전도', done: false },
-]
 
 const VERSES = [
   { text: '아무것도 염려하지 말고 오직 모든 일에 기도와 간구로 너희 구할 것을 감사함으로 하나님께 아뢰라', ref: '빌립보서 4:6' },
@@ -21,17 +16,23 @@ function fmt(sec) {
 }
 
 export default function Prayer() {
-  const [prayers, setPrayers] = useLocalStorage('pb_prayers', DEFAULT_PRAYERS)
-  const [nextId, setNextId] = useLocalStorage('pb_prayer_nextid', 5)
+  const [prayers, setPrayers] = useState([])
   const [activeCat, setActiveCat] = useState('전체')
   const [showModal, setShowModal] = useState(false)
   const [newText, setNewText] = useState('')
   const [newCat, setNewCat] = useState('가족')
-  const [totalSaved, setTotalSaved] = useLocalStorage('pb_timer_total', 0)
+  const [totalSaved, setTotalSaved] = useState(() => Number(localStorage.getItem('pb_timer_total') || 0))
   const [elapsed, setElapsed] = useState(0)
   const [isRunning, setIsRunning] = useState(false)
   const [completed, setCompleted] = useState(false)
-  const intervalRef = useRef(null)
+  const intervalRef = { current: null }
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'prayers'), snap => {
+      setPrayers(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    })
+    return unsub
+  }, [])
 
   useEffect(() => {
     return () => clearInterval(intervalRef.current)
@@ -39,32 +40,38 @@ export default function Prayer() {
 
   const start = () => {
     setCompleted(false)
-    intervalRef.current = setInterval(() => {
-      setElapsed(e => e + 1)
-    }, 1000)
+    intervalRef.current = setInterval(() => setElapsed(e => e + 1), 1000)
     setIsRunning(true)
   }
 
-  const stop = () => {
-    clearInterval(intervalRef.current)
-    setIsRunning(false)
-  }
+  const stop = () => { clearInterval(intervalRef.current); setIsRunning(false) }
 
-  const toggle = () => {
-    if (isRunning) { stop() } else { start() }
-  }
+  const toggle = () => { if (isRunning) { stop() } else { start() } }
 
-  const reset = () => {
-    stop()
-    setElapsed(0)
-    setCompleted(false)
-  }
+  const reset = () => { stop(); setElapsed(0); setCompleted(false) }
 
   const complete = () => {
     stop()
-    setTotalSaved(totalSaved + elapsed)
+    const newTotal = totalSaved + elapsed
+    setTotalSaved(newTotal)
+    localStorage.setItem('pb_timer_total', String(newTotal))
     setElapsed(0)
     setCompleted(true)
+  }
+
+  const togglePrayer = async (id, done) => {
+    await updateDoc(doc(db, 'prayers', id), { done: !done })
+  }
+
+  const deletePrayer = async (id, e) => {
+    e.stopPropagation()
+    await deleteDoc(doc(db, 'prayers', id))
+  }
+
+  const addPrayer = async () => {
+    if (!newText.trim()) return
+    await addDoc(collection(db, 'prayers'), { text: newText.trim(), cat: newCat, done: false })
+    setNewText(''); setNewCat('가족'); setShowModal(false)
   }
 
   const verse = VERSES[new Date().getDate() % VERSES.length]
@@ -72,21 +79,6 @@ export default function Prayer() {
   const doneCount = prayers.filter(p => p.done).length
   const filteredDone = filtered.filter(p => p.done).length
   const progPct = filtered.length ? (filteredDone / filtered.length) * 100 : 0
-
-  const togglePrayer = (id) => setPrayers(prayers.map(p => p.id === id ? { ...p, done: !p.done } : p))
-  const deletePrayer = (id, e) => { e.stopPropagation(); setPrayers(prayers.filter(p => p.id !== id)) }
-
-  const addPrayer = () => {
-    if (!newText.trim()) return
-    setPrayers([...prayers, { id: nextId, text: newText.trim(), cat: newCat, done: false }])
-    setNextId(nextId + 1)
-    setNewText('')
-    setNewCat('가족')
-    setShowModal(false)
-  }
-
-  const totalMins = Math.floor(totalSaved / 60)
-  const totalSecs = totalSaved % 60
 
   return (
     <div className={s.wrap}>
@@ -118,7 +110,7 @@ export default function Prayer() {
       <div className={s.list}>
         {filtered.length === 0 && <div className={s.empty}>이 카테고리에 기도 제목이 없어요</div>}
         {filtered.map(p => (
-          <div key={p.id} className={s.item + (p.done ? ' ' + s.done : '')} onClick={() => togglePrayer(p.id)}>
+          <div key={p.id} className={s.item + (p.done ? ' ' + s.done : '')} onClick={() => togglePrayer(p.id, p.done)}>
             <div className={s.circle}>
               {p.done && <svg width="12" height="12" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" stroke="white" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>}
             </div>
@@ -139,9 +131,7 @@ export default function Prayer() {
             {isRunning ? '⏸' : '▶'}
           </button>
         </div>
-        {completed && (
-          <div className={s.timerDone}>🙏 기도 완료! 오늘도 수고하셨어요</div>
-        )}
+        {completed && <div className={s.timerDone}>🙏 기도 완료! 오늘도 수고하셨어요</div>}
         {!completed && elapsed > 0 && !isRunning && (
           <button className={s.completeBtn} onClick={complete}>기도 완료 — 저장하기</button>
         )}

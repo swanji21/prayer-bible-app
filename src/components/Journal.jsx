@@ -1,13 +1,13 @@
-import { useState } from 'react'
-import { useLocalStorage } from '../useLocalStorage'
+import { useState, useEffect } from 'react'
+import { db } from '../firebase'
+import { collection, onSnapshot, addDoc, deleteDoc, doc } from 'firebase/firestore'
 import s from './Journal.module.css'
 
 const SEC_LABELS = ['본문 말씀', '오늘의 묵상', '나눔과 실천', '기도']
 const SEC_KEYS = ['scripture', 'meditation', 'sharing', 'prayer']
 
 export default function Journal() {
-  const [journals, setJournals] = useLocalStorage('pb_journals', [])
-  const [nextJid, setNextJid] = useLocalStorage('pb_journal_nextid', 1)
+  const [journals, setJournals] = useState([])
   const today = new Date()
   const todayVal = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0')
   const [selectedDate, setSelectedDate] = useState(todayVal)
@@ -18,17 +18,26 @@ export default function Journal() {
   const [prayer, setPrayer] = useState('')
   const [expandedId, setExpandedId] = useState(null)
 
-  const save = () => {
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'journals'), snap => {
+      setJournals(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    })
+    return unsub
+  }, [])
+
+  const save = async () => {
     const has = ref || scripture || meditation || sharing || prayer
     if (!has) return
     const parts = selectedDate.split('-')
     const date = parts[0] + '.' + parts[1] + '.' + parts[2]
-    setJournals([...journals, { id: nextJid, date, ref, scripture, meditation, sharing, prayer }])
-    setNextJid(nextJid + 1)
+    await addDoc(collection(db, 'journals'), { date, ref, scripture, meditation, sharing, prayer })
     setRef(''); setScripture(''); setMeditation(''); setSharing(''); setPrayer('')
   }
 
-  const deleteJournal = (id) => setJournals(journals.filter(j => j.id !== id))
+  const deleteJournal = async (id) => {
+    await deleteDoc(doc(db, 'journals', id))
+  }
+
   const sorted = [...journals].sort((a, b) => b.date.localeCompare(a.date))
 
   return (
