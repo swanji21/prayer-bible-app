@@ -1,0 +1,65 @@
+.wrap { padding: 16px 0 8px; }
+
+.cardTitle {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text2);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin-bottom: 8px;
+}
+
+.card {
+  background: var(--bg2);
+  border-radius: var(--radius-lg);
+  padding: 14px 16px;
+  border: 0.5px solid var(--border);
+}
+
+.statRow3 {
+  display: flex;
+  gap: 0;
+  margin-bottom: 14px;
+}
+.statBox {
+  flex: 1;
+  text-align: center;
+  padding: 8px 4px;
+  border-right: 0.5px solid var(--border);
+}
+.statBox:last-child { border-right: none; }
+.statNum { font-size: 22px; font-weight: 700; color: var(--text); margin-bottom: 3px; }
+.statLbl { font-size: 11px; color: var(--text2); }
+
+.bigProgRow { margin-bottom: 14px; }
+.bigProgLabel {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: var(--text2);
+  margin-bottom: 6px;
+}
+.bigProgPct { font-weight: 700; color: var(--gold); font-size: 14px; }
+.bigProgBg { height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
+.bigProgFill { height: 100%; background: var(--gold); border-radius: 4px; transition: width 0.6s ease; }
+
+.catStats { border-top: 0.5px solid var(--border); padding-top: 12px; }
+.catStatsLabel { font-size: 11px; color: var(--text2); font-weight: 600; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+.catStatRow { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+.catStatName { font-size: 12px; color: var(--text2); width: 36px; flex-shrink: 0; }
+.catStatBar { flex: 1; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+.catStatFill { height: 100%; background: var(--gold-mid); border-radius: 3px; transition: width 0.5s ease; }
+.catStatCount { font-size: 11px; color: var(--text2); width: 36px; text-align: right; flex-shrink: 0; }
+
+.completedBooks { border-top: 0.5px solid var(--border); padding-top: 12px; margin-top: 4px; }
+.bookChips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+.bookChip {
+  font-size: 11px;
+  padding: 3px 9px;
+  background: var(--gold-light);
+  border: 0.5px solid var(--gold);
+  border-radius: 10px;
+  color: #5a3e12;
+  font-weight: 500;
+}
