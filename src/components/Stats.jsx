@@ -39,7 +39,7 @@ export default function Stats() {
   const [prayers] = useLocalStorage('pb_prayers', [])
   const [journals] = useLocalStorage('pb_journals', [])
   const [readChapters] = useLocalStorage('pb_read_chapters', {})
-  const [timerSec] = useLocalStorage('pb_timer', 0)
+  const [timerSec] = useLocalStorage('pb_timer_total', 0)
 
   // 기도 통계
   const totalPrayers = prayers.length
