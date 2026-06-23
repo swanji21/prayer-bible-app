@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useLocalStorage } from '../useLocalStorage'
 import s from './Prayer.module.css'
 
@@ -12,9 +12,13 @@ const DEFAULT_PRAYERS = [
 
 const VERSES = [
   { text: '아무것도 염려하지 말고 오직 모든 일에 기도와 간구로 너희 구할 것을 감사함으로 하나님께 아뢰라', ref: '빌립보서 4:6' },
-  { text: '너는 내게 부르짖으라 내가 네게 응답하겠고 네가 알지 못하는 크고 은밀한 일을 네게 보이리라', ref: '예레미야 33:3' },
+  { text: '너는 내게 부르짖으라 내가 네게 응답하겠고 크고 은밀한 일을 네게 보이리라', ref: '예레미야 33:3' },
   { text: '구하라 그리하면 너희에게 주실 것이요 찾으라 그리하면 찾아낼 것이요', ref: '마태복음 7:7' },
 ]
+
+function fmt(sec) {
+  return String(Math.floor(sec / 60)).padStart(2, '0') + ':' + String(sec % 60).padStart(2, '0')
+}
 
 export default function Prayer() {
   const [prayers, setPrayers] = useLocalStorage('pb_prayers', DEFAULT_PRAYERS)
@@ -23,14 +27,51 @@ export default function Prayer() {
   const [showModal, setShowModal] = useState(false)
   const [newText, setNewText] = useState('')
   const [newCat, setNewCat] = useState('가족')
-  const [timerSec, setTimerSec] = useLocalStorage('pb_timer', 0)
-  const [running, setRunning] = useState(false)
-  const [intervalId, setIntervalId] = useState(null)
+  const [totalSaved, setTotalSaved] = useLocalStorage('pb_timer_total', 0)
+  const [elapsed, setElapsed] = useState(0)
+  const [isRunning, setIsRunning] = useState(false)
+  const [completed, setCompleted] = useState(false)
+  const intervalRef = useRef(null)
+
+  useEffect(() => {
+    return () => clearInterval(intervalRef.current)
+  }, [])
+
+  const start = () => {
+    setCompleted(false)
+    intervalRef.current = setInterval(() => {
+      setElapsed(e => e + 1)
+    }, 1000)
+    setIsRunning(true)
+  }
+
+  const stop = () => {
+    clearInterval(intervalRef.current)
+    setIsRunning(false)
+  }
+
+  const toggle = () => {
+    if (isRunning) { stop() } else { start() }
+  }
+
+  const reset = () => {
+    stop()
+    setElapsed(0)
+    setCompleted(false)
+  }
+
+  const complete = () => {
+    stop()
+    setTotalSaved(totalSaved + elapsed)
+    setElapsed(0)
+    setCompleted(true)
+  }
 
   const verse = VERSES[new Date().getDate() % VERSES.length]
-
   const filtered = activeCat === '전체' ? prayers : prayers.filter(p => p.cat === activeCat)
   const doneCount = prayers.filter(p => p.done).length
+  const filteredDone = filtered.filter(p => p.done).length
+  const progPct = filtered.length ? (filteredDone / filtered.length) * 100 : 0
 
   const togglePrayer = (id) => setPrayers(prayers.map(p => p.id === id ? { ...p, done: !p.done } : p))
   const deletePrayer = (id, e) => { e.stopPropagation(); setPrayers(prayers.filter(p => p.id !== id)) }
@@ -39,19 +80,12 @@ export default function Prayer() {
     if (!newText.trim()) return
     setPrayers([...prayers, { id: nextId, text: newText.trim(), cat: newCat, done: false }])
     setNextId(nextId + 1)
-    setNewText(''); setNewCat('가족'); setShowModal(false)
+    setNewText('')
+    setNewCat('가족')
+    setShowModal(false)
   }
 
-  const startTimer = () => {
-    const id = setInterval(() => setTimerSec(s => s + 1), 1000)
-    setIntervalId(id); setRunning(true)
-  }
-  const stopTimer = () => { clearInterval(intervalId); setRunning(false) }
-  const resetTimer = () => { stopTimer(); setTimerSec(0) }
-  const toggleTimer = () => running ? stopTimer() : startTimer()
-
-  const mm = String(Math.floor(timerSec / 60)).padStart(2, '0')
-  const ss = String(timerSec % 60).padStart(2, '0')
+  const totalMins = Math.floor(totalSaved / 60)
 
   return (
     <div className={s.wrap}>
@@ -60,62 +94,61 @@ export default function Prayer() {
         <span>{verse.ref}</span>
       </div>
 
-      {/* 카테고리 탭 */}
       <div className={s.catTabs}>
         {CATS.map(c => {
           const cnt = c === '전체' ? prayers.length : prayers.filter(p => p.cat === c).length
           return (
-            <button key={c} className={`${s.catTab} ${activeCat === c ? s.catActive : ''}`} onClick={() => setActiveCat(c)}>
-              {c}
-              {cnt > 0 && <span className={s.catBadge}>{cnt}</span>}
+            <button key={c} className={s.catTab + (activeCat === c ? ' ' + s.catActive : '')} onClick={() => setActiveCat(c)}>
+              {c}{cnt > 0 && <span className={s.catBadge}>{cnt}</span>}
             </button>
           )
         })}
       </div>
 
-      {/* 완료 현황 */}
       <div className={s.progressRow}>
         <span className={s.progressText}>
-          {activeCat === '전체' ? `전체 ${doneCount}/${prayers.length}` : `${activeCat} ${filtered.filter(p=>p.done).length}/${filtered.length}`} 완료
+          {activeCat === '전체' ? '전체 ' + doneCount + '/' + prayers.length : activeCat + ' ' + filteredDone + '/' + filtered.length} 완료
         </span>
         <div className={s.progressBar}>
-          <div className={s.progressFill} style={{
-            width: `${filtered.length ? (filtered.filter(p=>p.done).length / filtered.length) * 100 : 0}%`
-          }} />
+          <div className={s.progressFill} style={{ width: progPct + '%' }} />
         </div>
       </div>
 
-      {/* 기도 목록 */}
       <div className={s.list}>
-        {filtered.length === 0 && (
-          <div className={s.empty}>이 카테고리에 기도 제목이 없어요</div>
-        )}
+        {filtered.length === 0 && <div className={s.empty}>이 카테고리에 기도 제목이 없어요</div>}
         {filtered.map(p => (
-          <div key={p.id} className={`${s.item} ${p.done ? s.done : ''}`} onClick={() => togglePrayer(p.id)}>
+          <div key={p.id} className={s.item + (p.done ? ' ' + s.done : '')} onClick={() => togglePrayer(p.id)}>
             <div className={s.circle}>
               {p.done && <svg width="12" height="12" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" stroke="white" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>}
             </div>
             <span className={s.itemText}>{p.text}</span>
             <span className={s.cat}>{p.cat}</span>
-            <button className={s.del} onClick={(e) => deletePrayer(p.id, e)}>×</button>
+            <button className={s.del} onClick={(e) => deletePrayer(p.id, e)}>x</button>
           </div>
         ))}
       </div>
       <button className={s.addBtn} onClick={() => setShowModal(true)}>+ 기도 제목 추가</button>
 
-      {/* 타이머 */}
       <div className={s.timer}>
-        <div>
-          <div className={s.timerLabel}>기도 시간</div>
-          <div className={s.timerVal}>{mm}:{ss}</div>
+        <div className={s.timerTop}>
+          <div>
+            <div className={s.timerLabel}>기도 시간</div>
+            <div className={s.timerVal}>{fmt(elapsed)}</div>
+          </div>
+          <div className={s.timerBtns}>
+            <button className={s.tbtn} onClick={reset}>↺</button>
+            <button className={s.tbtn + (isRunning ? ' ' + s.running : '')} onClick={toggle}>
+              {isRunning ? '⏸' : '▶'}
+            </button>
+          </div>
         </div>
-        <div className={s.timerBtns}>
-          <button className={s.tbtn} onClick={resetTimer}>↺</button>
-          <button className={`${s.tbtn} ${running ? s.running : ''}`} onClick={toggleTimer}>{running ? '⏸' : '▶'}</button>
-        </div>
+        {completed && <div className={s.timerDone}>기도 완료! 오늘 총 {fmt(totalSaved)} 기도했어요 🙏</div>}
+        {!completed && elapsed > 0 && !isRunning && (
+          <button className={s.completeBtn} onClick={complete}>기도 완료 — 저장하기</button>
+        )}
+        <div className={s.timerTotal}>누적 기도 시간: {totalMins}분</div>
       </div>
 
-      {/* 추가 모달 */}
       {showModal && (
         <div className={s.overlay} onClick={() => setShowModal(false)}>
           <div className={s.sheet} onClick={e => e.stopPropagation()}>
@@ -124,7 +157,7 @@ export default function Prayer() {
               placeholder="기도 제목을 입력하세요" onKeyDown={e => e.key === 'Enter' && addPrayer()} autoFocus />
             <div className={s.catRow}>
               {CATS.filter(c => c !== '전체').map(c => (
-                <button key={c} className={`${s.catBtn} ${newCat === c ? s.catSel : ''}`} onClick={() => setNewCat(c)}>{c}</button>
+                <button key={c} className={s.catBtn + (newCat === c ? ' ' + s.catSel : '')} onClick={() => setNewCat(c)}>{c}</button>
               ))}
             </div>
             <div className={s.sheetBtns}>
