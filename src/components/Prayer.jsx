@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { db } from '../firebase'
-import { collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc } from 'firebase/firestore'
+import { collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc, getDoc, setDoc } from 'firebase/firestore'
 import s from './Prayer.module.css'
 
 const CATS = ['전체', '가족', '직장', '교회', '전도', '감사', '치유', '기타']
@@ -21,11 +21,17 @@ export default function Prayer() {
   const [showModal, setShowModal] = useState(false)
   const [newText, setNewText] = useState('')
   const [newCat, setNewCat] = useState('가족')
-  const [totalSaved, setTotalSaved] = useState(() => Number(localStorage.getItem('pb_timer_total') || 0))
+  const [totalSaved, setTotalSaved] = useState(0)
   const [elapsed, setElapsed] = useState(0)
   const [isRunning, setIsRunning] = useState(false)
   const [completed, setCompleted] = useState(false)
   const intervalRef = { current: null }
+
+  useEffect(() => {
+    getDoc(doc(db, 'stats', 'timer')).then(d => {
+      if (d.exists()) setTotalSaved(d.data().total || 0)
+    })
+  }, [])
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'prayers'), snap => {
@@ -50,11 +56,11 @@ export default function Prayer() {
 
   const reset = () => { stop(); setElapsed(0); setCompleted(false) }
 
-  const complete = () => {
+  const complete = async () => {
     stop()
     const newTotal = totalSaved + elapsed
     setTotalSaved(newTotal)
-    localStorage.setItem('pb_timer_total', String(newTotal))
+    await setDoc(doc(db, 'stats', 'timer'), { total: newTotal })
     setElapsed(0)
     setCompleted(true)
   }
