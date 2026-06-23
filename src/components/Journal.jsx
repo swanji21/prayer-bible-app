@@ -8,6 +8,9 @@ const SEC_KEYS = ['scripture', 'meditation', 'sharing', 'prayer']
 export default function Journal() {
   const [journals, setJournals] = useLocalStorage('pb_journals', [])
   const [nextJid, setNextJid] = useLocalStorage('pb_journal_nextid', 1)
+  const today = new Date()
+  const todayVal = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0')
+  const [selectedDate, setSelectedDate] = useState(todayVal)
   const [ref, setRef] = useState('')
   const [scripture, setScripture] = useState('')
   const [meditation, setMeditation] = useState('')
@@ -18,18 +21,23 @@ export default function Journal() {
   const save = () => {
     const has = ref || scripture || meditation || sharing || prayer
     if (!has) return
-    const d = new Date()
-    const date = d.getFullYear() + '.' + String(d.getMonth()+1).padStart(2,'0') + '.' + String(d.getDate()).padStart(2,'0')
+    const parts = selectedDate.split('-')
+    const date = parts[0] + '.' + parts[1] + '.' + parts[2]
     setJournals([...journals, { id: nextJid, date, ref, scripture, meditation, sharing, prayer }])
     setNextJid(nextJid + 1)
     setRef(''); setScripture(''); setMeditation(''); setSharing(''); setPrayer('')
   }
 
   const deleteJournal = (id) => setJournals(journals.filter(j => j.id !== id))
+  const sorted = [...journals].sort((a, b) => b.date.localeCompare(a.date))
 
   return (
     <div className={s.wrap}>
       <div className={s.compose}>
+        <div className={s.dateRow}>
+          <label className={s.dateLabel}>날짜</label>
+          <input type="date" className={s.dateInput} value={selectedDate} onChange={e => setSelectedDate(e.target.value)} />
+        </div>
         <input className={s.refInput} value={ref} onChange={e => setRef(e.target.value)} placeholder="성경 구절 (예: 시편 23:1)" />
         <div className={s.sectionBlock}>
           <div className={s.sectionTag}>본문 말씀</div>
@@ -52,7 +60,7 @@ export default function Journal() {
 
       {journals.length === 0 && <div className={s.empty}>아직 묵상 기록이 없어요</div>}
 
-      {[...journals].reverse().map(j => {
+      {sorted.map(j => {
         const isOpen = expandedId === j.id
         return (
           <div key={j.id} className={s.card}>

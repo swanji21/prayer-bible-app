@@ -116,3 +116,7 @@
   display: inline-block;
 }
 .secText { font-size: 13px; color: var(--text); line-height: 1.7; }
+.dateRow { display: flex; align-items: center; gap: 10px; }
+.dateLabel { font-size: 13px; color: var(--text2); white-space: nowrap; }
+.dateInput { flex: 1; padding: 8px 12px; font-size: 14px; background: var(--bg2); border: 0.5px solid var(--border); border-radius: var(--radius); color: var(--text); outline: none; }
+.dateInput:focus { border-color: var(--gold-mid); }
