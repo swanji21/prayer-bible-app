@@ -86,6 +86,7 @@ export default function Prayer() {
   }
 
   const totalMins = Math.floor(totalSaved / 60)
+  const totalSecs = totalSaved % 60
 
   return (
     <div className={s.wrap}>
@@ -130,23 +131,21 @@ export default function Prayer() {
       <button className={s.addBtn} onClick={() => setShowModal(true)}>+ 기도 제목 추가</button>
 
       <div className={s.timer}>
-        <div className={s.timerTop}>
-          <div>
-            <div className={s.timerLabel}>기도 시간</div>
-            <div className={s.timerVal}>{fmt(elapsed)}</div>
-          </div>
-          <div className={s.timerBtns}>
-            <button className={s.tbtn} onClick={reset}>↺</button>
-            <button className={s.tbtn + (isRunning ? ' ' + s.running : '')} onClick={toggle}>
-              {isRunning ? '⏸' : '▶'}
-            </button>
-          </div>
+        <div className={s.timerLabel}>기도 시간</div>
+        <div className={s.timerVal}>{fmt(elapsed)}</div>
+        <div className={s.timerBtns}>
+          <button className={s.tbtn} onClick={reset}>↺</button>
+          <button className={s.tbtn + (isRunning ? ' ' + s.running : '')} onClick={toggle}>
+            {isRunning ? '⏸' : '▶'}
+          </button>
         </div>
-        {completed && <div className={s.timerDone}>기도 완료! 오늘 총 {fmt(totalSaved)} 기도했어요 🙏</div>}
+        {completed && (
+          <div className={s.timerDone}>🙏 기도 완료! 오늘도 수고하셨어요</div>
+        )}
         {!completed && elapsed > 0 && !isRunning && (
           <button className={s.completeBtn} onClick={complete}>기도 완료 — 저장하기</button>
         )}
-        <div className={s.timerTotal}>누적 기도 시간: {totalMins}분</div>
+        <div className={s.timerTotal}>누적 기도 시간 {fmt(totalSaved)}</div>
       </div>
 
       {showModal && (

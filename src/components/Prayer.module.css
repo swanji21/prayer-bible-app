@@ -80,13 +80,11 @@
 .addBtn { width: 100%; padding: 10px; font-size: 14px; border: 1.5px dashed var(--border2); border-radius: var(--radius); background: transparent; color: var(--text2); margin-top: 8px; transition: background 0.15s; }
 .addBtn:hover { background: var(--bg2); }
 
-.timer { display: flex; align-items: center; justify-content: space-between; background: var(--navy); border-radius: var(--radius-lg); padding: 14px 18px; margin-top: 16px; }
-.timerLabel { font-size: 11px; color: rgba(255,255,255,0.5); margin-bottom: 3px; }
-.timerVal { font-size: 28px; font-weight: 600; color: var(--gold-mid); font-variant-numeric: tabular-nums; letter-spacing: 2px; }
-.timerBtns { display: flex; gap: 10px; }
-.tbtn { width: 38px; height: 38px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,0.25); background: transparent; color: #fff; font-size: 16px; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
-.tbtn:hover { background: rgba(255,255,255,0.1); }
-.tbtn.running { border-color: var(--gold-mid); color: var(--gold-mid); }
+
+
+
+
+
 
 .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 100; display: flex; align-items: flex-end; justify-content: center; }
 .sheet { background: var(--bg); border-radius: 20px 20px 0 0; padding: 22px 18px 40px; width: 100%; max-width: 430px; }
@@ -99,3 +97,17 @@
 .sheetBtns { display: flex; gap: 8px; }
 .cancelBtn { flex: 1; padding: 12px; border-radius: var(--radius); background: var(--bg2); border: 0.5px solid var(--border); color: var(--text2); font-size: 15px; }
 .confirmBtn { flex: 1; padding: 12px; border-radius: var(--radius); background: var(--navy); border: none; color: var(--gold-mid); font-size: 15px; font-weight: 600; }
+
+.timer { background: var(--navy); border-radius: var(--radius-lg); padding: 18px 16px 14px; margin-top: 16px; }
+
+.timerTop { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.timerLabel { font-size: 11px; color: rgba(255,255,255,0.5); margin-bottom: 4px; text-align: center; }
+.timerVal { font-size: 42px; font-weight: 700; color: var(--gold-mid); font-variant-numeric: tabular-nums; letter-spacing: 3px; text-align: center; margin-bottom: 12px; }
+.timerBtns { display: flex; gap: 12px; justify-content: center; margin-bottom: 12px; }
+.tbtn { width: 44px; height: 44px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,0.25); background: transparent; color: #fff; font-size: 18px; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
+.tbtn:hover { background: rgba(255,255,255,0.1); }
+.tbtn.running { border-color: var(--gold-mid); color: var(--gold-mid); }
+.completeBtn { width: 100%; padding: 10px; background: var(--gold); border: none; border-radius: var(--radius); color: #fff; font-size: 14px; font-weight: 600; margin-bottom: 10px; cursor: pointer; transition: opacity 0.15s; }
+.completeBtn:hover { opacity: 0.85; }
+.timerDone { text-align: center; font-size: 13px; color: var(--gold-mid); margin-bottom: 10px; }
+.timerTotal { text-align: center; font-size: 11px; color: rgba(255,255,255,0.4); }
