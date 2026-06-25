@@ -120,3 +120,11 @@
 .dateLabel { font-size: 13px; color: var(--text2); white-space: nowrap; }
 .dateInput { flex: 1; padding: 8px 12px; font-size: 14px; background: var(--bg2); border: 0.5px solid var(--border); border-radius: var(--radius); color: var(--text); outline: none; }
 .dateInput:focus { border-color: var(--gold-mid); }
+
+.editHeader { padding: 12px 14px 0; }
+.editBody { padding: 0 14px 14px; display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+.editBtns { display: flex; gap: 8px; margin-top: 4px; }
+.cancelEditBtn { flex: 1; padding: 10px; border-radius: var(--radius); background: var(--bg2); border: 0.5px solid var(--border); color: var(--text2); font-size: 14px; }
+.saveEditBtn { flex: 1; padding: 10px; border-radius: var(--radius); background: var(--navy); border: none; color: var(--gold-mid); font-size: 14px; font-weight: 600; }
+.editBtn { background: transparent; border: none; color: var(--gold); font-size: 14px; opacity: 0.8; }
+.editBtn:hover { opacity: 1; }

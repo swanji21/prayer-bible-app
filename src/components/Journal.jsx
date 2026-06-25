@@ -1,22 +1,31 @@
 import { useState, useEffect } from 'react'
 import { db } from '../firebase'
-import { collection, onSnapshot, addDoc, deleteDoc, doc } from 'firebase/firestore'
+import { collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc } from 'firebase/firestore'
 import s from './Journal.module.css'
 
-const SEC_LABELS = ['본문 말씀', '오늘의 묵상', '나눔과 실천', '기도']
-const SEC_KEYS = ['scripture', 'meditation', 'sharing', 'prayer']
+const SEC_LABELS = ['본문 말씀', '관주', '오늘의 묵상', '나눔과 실천', '기도']
+const SEC_KEYS = ['scripture', 'crossref', 'meditation', 'sharing', 'prayer']
+const PLACEHOLDERS = [
+  '오늘 읽은 말씀 구절을 적어보세요...',
+  '참고 구절을 적어보세요 (예: 요 3:16, 롬 8:28)',
+  '말씀을 통해 느낀 점을 적어보세요...',
+  '오늘 삶에서 나누고 실천할 것을 적어보세요...',
+  '오늘의 기도 제목을 적어보세요...',
+]
+const ROWS = [2, 2, 3, 3, 3]
+
+const emptyForm = { ref: '', scripture: '', crossref: '', meditation: '', sharing: '', prayer: '' }
 
 export default function Journal() {
   const [journals, setJournals] = useState([])
   const today = new Date()
   const todayVal = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0')
   const [selectedDate, setSelectedDate] = useState(todayVal)
-  const [ref, setRef] = useState('')
-  const [scripture, setScripture] = useState('')
-  const [meditation, setMeditation] = useState('')
-  const [sharing, setSharing] = useState('')
-  const [prayer, setPrayer] = useState('')
+  const [form, setForm] = useState(emptyForm)
   const [expandedId, setExpandedId] = useState(null)
+  const [editingId, setEditingId] = useState(null)
+  const [editForm, setEditForm] = useState(emptyForm)
+  const [editDate, setEditDate] = useState('')
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'journals'), snap => {
@@ -25,45 +34,61 @@ export default function Journal() {
     return unsub
   }, [])
 
+  const updateForm = (key, val) => setForm(f => ({ ...f, [key]: val }))
+  const updateEditForm = (key, val) => setEditForm(f => ({ ...f, [key]: val }))
+
   const save = async () => {
-    const has = ref || scripture || meditation || sharing || prayer
+    const has = Object.values(form).some(v => v.trim())
     if (!has) return
     const parts = selectedDate.split('-')
     const date = parts[0] + '.' + parts[1] + '.' + parts[2]
-    await addDoc(collection(db, 'journals'), { date, ref, scripture, meditation, sharing, prayer })
-    setRef(''); setScripture(''); setMeditation(''); setSharing(''); setPrayer('')
+    await addDoc(collection(db, 'journals'), { date, ...form })
+    setForm(emptyForm)
   }
 
   const deleteJournal = async (id) => {
     await deleteDoc(doc(db, 'journals', id))
   }
 
+  const startEdit = (j) => {
+    setEditingId(j.id)
+    setEditForm({
+      ref: j.ref || '',
+      scripture: j.scripture || '',
+      crossref: j.crossref || '',
+      meditation: j.meditation || '',
+      sharing: j.sharing || '',
+      prayer: j.prayer || '',
+    })
+    const parts = j.date.split('.')
+    setEditDate(parts[0] + '-' + parts[1] + '-' + parts[2])
+    setExpandedId(null)
+  }
+
+  const saveEdit = async () => {
+    const parts = editDate.split('-')
+    const date = parts[0] + '.' + parts[1] + '.' + parts[2]
+    await updateDoc(doc(db, 'journals', editingId), { date, ...editForm })
+    setEditingId(null)
+  }
+
   const sorted = [...journals].sort((a, b) => b.date.localeCompare(a.date))
 
   return (
     <div className={s.wrap}>
+      {/* 작성 폼 */}
       <div className={s.compose}>
         <div className={s.dateRow}>
           <label className={s.dateLabel}>날짜</label>
           <input type="date" className={s.dateInput} value={selectedDate} onChange={e => setSelectedDate(e.target.value)} />
         </div>
-        <input className={s.refInput} value={ref} onChange={e => setRef(e.target.value)} placeholder="성경 구절 (예: 시편 23:1)" />
-        <div className={s.sectionBlock}>
-          <div className={s.sectionTag}>본문 말씀</div>
-          <textarea className={s.sectionArea} rows={2} value={scripture} onChange={e => setScripture(e.target.value)} placeholder="오늘 읽은 말씀 구절을 적어보세요..." />
-        </div>
-        <div className={s.sectionBlock}>
-          <div className={s.sectionTag}>오늘의 묵상</div>
-          <textarea className={s.sectionArea} rows={3} value={meditation} onChange={e => setMeditation(e.target.value)} placeholder="말씀을 통해 느낀 점을 적어보세요..." />
-        </div>
-        <div className={s.sectionBlock}>
-          <div className={s.sectionTag}>나눔과 실천</div>
-          <textarea className={s.sectionArea} rows={3} value={sharing} onChange={e => setSharing(e.target.value)} placeholder="오늘 삶에서 나누고 실천할 것을 적어보세요..." />
-        </div>
-        <div className={s.sectionBlock}>
-          <div className={s.sectionTag}>기도</div>
-          <textarea className={s.sectionArea} rows={3} value={prayer} onChange={e => setPrayer(e.target.value)} placeholder="오늘의 기도 제목을 적어보세요..." />
-        </div>
+        <input className={s.refInput} value={form.ref} onChange={e => updateForm('ref', e.target.value)} placeholder="성경 구절 (예: 시편 23:1)" />
+        {SEC_LABELS.map((label, i) => (
+          <div key={label} className={s.sectionBlock}>
+            <div className={s.sectionTag}>{label}</div>
+            <textarea className={s.sectionArea} rows={ROWS[i]} value={form[SEC_KEYS[i]]} onChange={e => updateForm(SEC_KEYS[i], e.target.value)} placeholder={PLACEHOLDERS[i]} />
+          </div>
+        ))}
         <button className={s.saveBtn} onClick={save}>묵상 저장</button>
       </div>
 
@@ -71,6 +96,34 @@ export default function Journal() {
 
       {sorted.map(j => {
         const isOpen = expandedId === j.id
+        const isEditing = editingId === j.id
+
+        if (isEditing) {
+          return (
+            <div key={j.id} className={s.card}>
+              <div className={s.editHeader}>
+                <div className={s.dateRow}>
+                  <label className={s.dateLabel}>날짜</label>
+                  <input type="date" className={s.dateInput} value={editDate} onChange={e => setEditDate(e.target.value)} />
+                </div>
+              </div>
+              <div className={s.editBody}>
+                <input className={s.refInput} value={editForm.ref} onChange={e => updateEditForm('ref', e.target.value)} placeholder="성경 구절" />
+                {SEC_LABELS.map((label, i) => (
+                  <div key={label} className={s.sectionBlock}>
+                    <div className={s.sectionTag}>{label}</div>
+                    <textarea className={s.sectionArea} rows={ROWS[i]} value={editForm[SEC_KEYS[i]]} onChange={e => updateEditForm(SEC_KEYS[i], e.target.value)} placeholder={PLACEHOLDERS[i]} />
+                  </div>
+                ))}
+                <div className={s.editBtns}>
+                  <button className={s.cancelEditBtn} onClick={() => setEditingId(null)}>취소</button>
+                  <button className={s.saveEditBtn} onClick={saveEdit}>저장</button>
+                </div>
+              </div>
+            </div>
+          )
+        }
+
         return (
           <div key={j.id} className={s.card}>
             <div className={s.cardTop} onClick={() => setExpandedId(isOpen ? null : j.id)}>
@@ -79,6 +132,7 @@ export default function Journal() {
                 {j.ref && <span className={s.cardRef}>{j.ref}</span>}
               </div>
               <div className={s.cardRight}>
+                <button className={s.editBtn} onClick={e => { e.stopPropagation(); startEdit(j) }}>✏</button>
                 <button className={s.delBtn} onClick={e => { e.stopPropagation(); deleteJournal(j.id) }}>x</button>
                 <span className={s.expandIcon}>{isOpen ? 'A' : 'V'}</span>
               </div>
