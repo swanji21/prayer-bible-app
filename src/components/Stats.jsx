@@ -1,4 +1,6 @@
-import { useLocalStorage } from '../useLocalStorage'
+import { useState, useEffect } from 'react'
+import { db } from '../firebase'
+import { collection, onSnapshot, doc, getDoc } from 'firebase/firestore'
 import s from './Stats.module.css'
 
 const BIBLE_BOOKS = {
@@ -35,17 +37,28 @@ const TOTAL_CHAPTERS = Object.values(BIBLE_BOOKS).flat().reduce((a, b) => a + b.
 const OT_TOTAL = BIBLE_BOOKS['구약'].reduce((a, b) => a + b.chapters, 0)
 const NT_TOTAL = BIBLE_BOOKS['신약'].reduce((a, b) => a + b.chapters, 0)
 
-export default function Stats() {
-  const [prayers] = useLocalStorage('pb_prayers', [])
-  const [journals] = useLocalStorage('pb_journals', [])
-  const [readChapters] = useLocalStorage('pb_read_chapters', {})
-  const [timerSec] = useLocalStorage('pb_timer_total', 0)
+function fmt(sec) {
+  return String(Math.floor(sec / 60)).padStart(2, '0') + ':' + String(sec % 60).padStart(2, '0')
+}
 
-  // 기도 통계
+export default function Stats() {
+  const [prayers, setPrayers] = useState([])
+  const [journals, setJournals] = useState([])
+  const [readChapters] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('pb_read_chapters') || '{}') } catch { return {} }
+  })
+  const [timerTotal, setTimerTotal] = useState(0)
+
+  useEffect(() => {
+    const u1 = onSnapshot(collection(db, 'prayers'), s => setPrayers(s.docs.map(d => ({ id: d.id, ...d.data() }))))
+    const u2 = onSnapshot(collection(db, 'journals'), s => setJournals(s.docs.map(d => ({ id: d.id, ...d.data() }))))
+    getDoc(doc(db, 'stats', 'timer')).then(d => { if (d.exists()) setTimerTotal(d.data().total || 0) })
+    return () => { u1(); u2() }
+  }, [])
+
   const totalPrayers = prayers.length
   const donePrayers = prayers.filter(p => p.done).length
   const prayPct = totalPrayers ? Math.round((donePrayers / totalPrayers) * 100) : 0
-  const prayTimeMins = Math.floor(timerSec / 60)
 
   const catCounts = CATS.map(cat => ({
     cat,
@@ -53,24 +66,18 @@ export default function Stats() {
     done: prayers.filter(p => p.cat === cat && p.done).length,
   })).filter(c => c.total > 0)
 
-  // 성경 통독 통계
   const totalRead = Object.values(readChapters).reduce((a, b) => a + b.length, 0)
   const biblePct = Math.round((totalRead / TOTAL_CHAPTERS) * 100)
   const otRead = BIBLE_BOOKS['구약'].reduce((a, b) => a + (readChapters[b.name] || []).length, 0)
   const ntRead = BIBLE_BOOKS['신약'].reduce((a, b) => a + (readChapters[b.name] || []).length, 0)
   const otPct = Math.round((otRead / OT_TOTAL) * 100)
   const ntPct = Math.round((ntRead / NT_TOTAL) * 100)
-
   const completedBooks = Object.values(BIBLE_BOOKS).flat().filter(b => (readChapters[b.name] || []).length >= b.chapters)
-
-  // 묵상 통계
   const journalCount = journals.length
 
   return (
     <div className={s.wrap}>
-
-      {/* 기도 통계 */}
-      <div className={s.cardTitle}>🙏 기도 통계</div>
+      <div className={s.cardTitle}>기도 통계</div>
       <div className={s.card}>
         <div className={s.statRow3}>
           <div className={s.statBox}>
@@ -82,30 +89,24 @@ export default function Stats() {
             <div className={s.statLbl}>완료</div>
           </div>
           <div className={s.statBox}>
-            <div className={s.statNum}>{prayTimeMins}분</div>
-            <div className={s.statLbl}>기도 시간</div>
+            <div className={s.statNum}>{fmt(timerTotal)}</div>
+            <div className={s.statLbl}>누적 기도</div>
           </div>
         </div>
-
         <div className={s.bigProgRow}>
           <div className={s.bigProgLabel}>
-            <span>오늘 완료율</span>
+            <span>완료율</span>
             <span className={s.bigProgPct}>{prayPct}%</span>
           </div>
-          <div className={s.bigProgBg}>
-            <div className={s.bigProgFill} style={{width:`${prayPct}%`}} />
-          </div>
+          <div className={s.bigProgBg}><div className={s.bigProgFill} style={{width: prayPct + '%'}} /></div>
         </div>
-
         {catCounts.length > 0 && (
           <div className={s.catStats}>
             <div className={s.catStatsLabel}>카테고리별</div>
             {catCounts.map(({ cat, total, done }) => (
               <div key={cat} className={s.catStatRow}>
                 <span className={s.catStatName}>{cat}</span>
-                <div className={s.catStatBar}>
-                  <div className={s.catStatFill} style={{width: total ? `${(done/total)*100}%` : '0%'}} />
-                </div>
+                <div className={s.catStatBar}><div className={s.catStatFill} style={{width: total ? (done/total)*100 + '%' : '0%'}} /></div>
                 <span className={s.catStatCount}>{done}/{total}</span>
               </div>
             ))}
@@ -113,8 +114,7 @@ export default function Stats() {
         )}
       </div>
 
-      {/* 성경 통독 통계 */}
-      <div className={s.cardTitle} style={{marginTop:16}}>📖 통독 통계</div>
+      <div className={s.cardTitle} style={{marginTop:16}}>성경 통독 통계</div>
       <div className={s.card}>
         <div className={s.statRow3}>
           <div className={s.statBox}>
@@ -130,49 +130,37 @@ export default function Stats() {
             <div className={s.statLbl}>완독 권</div>
           </div>
         </div>
-
         <div className={s.bigProgRow}>
           <div className={s.bigProgLabel}>
             <span>전체 진행률</span>
             <span className={s.bigProgPct}>{biblePct}%</span>
           </div>
-          <div className={s.bigProgBg}>
-            <div className={s.bigProgFill} style={{width:`${biblePct}%`}} />
-          </div>
+          <div className={s.bigProgBg}><div className={s.bigProgFill} style={{width: biblePct + '%'}} /></div>
         </div>
-
         <div className={s.catStats}>
           <div className={s.catStatsLabel}>구약 / 신약</div>
           <div className={s.catStatRow}>
             <span className={s.catStatName}>구약</span>
-            <div className={s.catStatBar}>
-              <div className={s.catStatFill} style={{width:`${otPct}%`}} />
-            </div>
+            <div className={s.catStatBar}><div className={s.catStatFill} style={{width: otPct + '%'}} /></div>
             <span className={s.catStatCount}>{otRead}/{OT_TOTAL}</span>
           </div>
           <div className={s.catStatRow}>
             <span className={s.catStatName}>신약</span>
-            <div className={s.catStatBar}>
-              <div className={s.catStatFill} style={{width:`${ntPct}%`}} />
-            </div>
+            <div className={s.catStatBar}><div className={s.catStatFill} style={{width: ntPct + '%'}} /></div>
             <span className={s.catStatCount}>{ntRead}/{NT_TOTAL}</span>
           </div>
         </div>
-
         {completedBooks.length > 0 && (
           <div className={s.completedBooks}>
             <div className={s.catStatsLabel}>완독한 책</div>
             <div className={s.bookChips}>
-              {completedBooks.map(b => (
-                <span key={b.name} className={s.bookChip}>{b.name}</span>
-              ))}
+              {completedBooks.map(b => <span key={b.name} className={s.bookChip}>{b.name}</span>)}
             </div>
           </div>
         )}
       </div>
 
-      {/* 묵상 통계 */}
-      <div className={s.cardTitle} style={{marginTop:16}}>✍ 묵상 통계</div>
+      <div className={s.cardTitle} style={{marginTop:16}}>묵상 통계</div>
       <div className={s.card}>
         <div className={s.statRow3}>
           <div className={s.statBox}>
@@ -184,12 +172,11 @@ export default function Stats() {
             <div className={s.statLbl}>꾸준한 주</div>
           </div>
           <div className={s.statBox}>
-            <div className={s.statNum}>{journalCount > 0 ? '🔥' : '—'}</div>
-            <div className={s.statLbl}>기록 중</div>
+            <div className={s.statNum}>{journalCount > 0 ? '활성' : '-'}</div>
+            <div className={s.statLbl}>상태</div>
           </div>
         </div>
       </div>
-
     </div>
   )
 }
