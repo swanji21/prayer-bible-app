@@ -1,5 +1,6 @@
-import { useState } from 'react'
-import { useLocalStorage } from '../useLocalStorage'
+import { useState, useEffect } from 'react'
+import { db } from '../firebase'
+import { doc, onSnapshot, setDoc } from 'firebase/firestore'
 import s from './Bible.module.css'
 
 const BIBLE_BOOKS = {
@@ -34,58 +35,83 @@ const BIBLE_BOOKS = {
 const TOTAL_CHAPTERS = Object.values(BIBLE_BOOKS).flat().reduce((a, b) => a + b.chapters, 0)
 
 export default function Bible() {
-  const [readChapters, setReadChapters] = useLocalStorage('pb_read_chapters', {})
-  const [noteMap, setNoteMap] = useLocalStorage('pb_notes', {})
+  const [readChapters, setReadChapters] = useState({})
+  const [noteMap, setNoteMap] = useState({})
   const [activeSection, setActiveSection] = useState('구약')
   const [expandedBook, setExpandedBook] = useState(null)
+  const [loading, setLoading] = useState(true)
 
   const todayKey = new Date().toISOString().slice(0, 10)
-  const note = noteMap[todayKey] || ''
 
-  const totalRead = Object.values(readChapters).reduce((a, b) => a + b.length, 0)
-  const pct = Math.min(100, Math.round((totalRead / TOTAL_CHAPTERS) * 100))
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'bible', 'progress'), d => {
+      if (d.exists()) {
+        setReadChapters(d.data().readChapters || {})
+        setNoteMap(d.data().noteMap || {})
+      }
+      setLoading(false)
+    })
+    return unsub
+  }, [])
 
-  const getBookRead = (bookName, chapters) => readChapters[bookName] || []
-  const isBookDone = (bookName, chapters) => (readChapters[bookName] || []).length >= chapters
-
-  const toggleChapter = (bookName, chNum) => {
-    const prev = readChapters[bookName] || []
-    const next = prev.includes(chNum) ? prev.filter(c => c !== chNum) : [...prev, chNum].sort((a,b)=>a-b)
-    setReadChapters({ ...readChapters, [bookName]: next })
+  const saveToFirebase = async (newRead, newNotes) => {
+    await setDoc(doc(db, 'bible', 'progress'), {
+      readChapters: newRead,
+      noteMap: newNotes
+    })
   }
 
-  const markBookAll = (bookName, chapters) => {
+  const toggleChapter = async (bookName, chNum) => {
+    const prev = readChapters[bookName] || []
+    const next = prev.includes(chNum) ? prev.filter(c => c !== chNum) : [...prev, chNum].sort((a,b)=>a-b)
+    const newRead = { ...readChapters, [bookName]: next }
+    setReadChapters(newRead)
+    await saveToFirebase(newRead, noteMap)
+  }
+
+  const markBookAll = async (bookName, chapters) => {
     const all = Array.from({ length: chapters }, (_, i) => i + 1)
     const current = readChapters[bookName] || []
     const allDone = current.length >= chapters
-    setReadChapters({ ...readChapters, [bookName]: allDone ? [] : all })
+    const newRead = { ...readChapters, [bookName]: allDone ? [] : all }
+    setReadChapters(newRead)
+    await saveToFirebase(newRead, noteMap)
   }
+
+  const updateNote = async (val) => {
+    const newNotes = { ...noteMap, [todayKey]: val }
+    setNoteMap(newNotes)
+    await saveToFirebase(readChapters, newNotes)
+  }
+
+  const totalRead = Object.values(readChapters).reduce((a, b) => a + b.length, 0)
+  const pct = Math.min(100, Math.round((totalRead / TOTAL_CHAPTERS) * 100))
 
   const books = BIBLE_BOOKS[activeSection]
   const sectionTotal = books.reduce((a, b) => a + b.chapters, 0)
   const sectionRead = books.reduce((a, b) => a + (readChapters[b.name] || []).length, 0)
   const sectionPct = Math.round((sectionRead / sectionTotal) * 100)
 
+  if (loading) return <div className={s.loading}>불러오는 중...</div>
+
   return (
     <div className={s.wrap}>
-      {/* 전체 진행률 */}
       <div className={s.planHeader}>
         <div className={s.planTitle}>전체 성경 통독 — 1,189장</div>
-        <div className={s.progBg}><div className={s.progFill} style={{ width: `${pct}%` }} /></div>
+        <div className={s.progBg}><div className={s.progFill} style={{ width: pct + '%' }} /></div>
         <div className={s.planInfo}>
           <span>{totalRead} / {TOTAL_CHAPTERS}장 읽음</span>
           <span>{pct}% 완료</span>
         </div>
       </div>
 
-      {/* 구약 / 신약 탭 */}
       <div className={s.sectionTabs}>
         {Object.keys(BIBLE_BOOKS).map(sec => {
           const bs = BIBLE_BOOKS[sec]
           const tot = bs.reduce((a,b)=>a+b.chapters,0)
           const rd = bs.reduce((a,b)=>a+(readChapters[b.name]||[]).length,0)
           return (
-            <button key={sec} className={`${s.secTab} ${activeSection===sec ? s.secActive : ''}`} onClick={() => setActiveSection(sec)}>
+            <button key={sec} className={s.secTab + (activeSection===sec ? ' ' + s.secActive : '')} onClick={() => setActiveSection(sec)}>
               {sec}
               <span className={s.secPct}>{Math.round((rd/tot)*100)}%</span>
             </button>
@@ -93,23 +119,21 @@ export default function Bible() {
         })}
       </div>
 
-      {/* 섹션 진행률 */}
       <div className={s.secProgress}>
         <span className={s.secProgressTxt}>{activeSection} {sectionRead}/{sectionTotal}장</span>
-        <div className={s.progBg} style={{flex:1}}><div className={s.progFill} style={{width:`${sectionPct}%`}} /></div>
+        <div className={s.progBg} style={{flex:1}}><div className={s.progFill} style={{width: sectionPct + '%'}} /></div>
       </div>
 
-      {/* 권별 목록 */}
       <div className={s.bookList}>
         {books.map(({ name, chapters }) => {
-          const readList = getBookRead(name, chapters)
-          const done = isBookDone(name, chapters)
+          const readList = readChapters[name] || []
+          const done = readList.length >= chapters
           const partial = readList.length > 0 && !done
           const isExpanded = expandedBook === name
 
           return (
             <div key={name} className={s.bookItem}>
-              <div className={`${s.bookRow} ${done ? s.bookDone : partial ? s.bookPartial : ''}`}>
+              <div className={s.bookRow + (done ? ' ' + s.bookDone : partial ? ' ' + s.bookPartial : '')}>
                 <div className={s.bookDot} />
                 <span className={s.bookName} onClick={() => setExpandedBook(isExpanded ? null : name)}>{name}</span>
                 <span className={s.bookProgress}>{readList.length}/{chapters}</span>
@@ -124,11 +148,8 @@ export default function Bible() {
               {isExpanded && (
                 <div className={s.chapterGrid}>
                   {Array.from({ length: chapters }, (_, i) => i + 1).map(ch => (
-                    <button
-                      key={ch}
-                      className={`${s.chBtn} ${readList.includes(ch) ? s.chDone : ''}`}
-                      onClick={() => toggleChapter(name, ch)}
-                    >
+                    <button key={ch} className={s.chBtn + (readList.includes(ch) ? ' ' + s.chDone : '')}
+                      onClick={() => toggleChapter(name, ch)}>
                       {ch}
                     </button>
                   ))}
@@ -139,11 +160,11 @@ export default function Bible() {
         })}
       </div>
 
-      {/* 오늘 메모 */}
       <div className={s.noteBox}>
         <div className={s.noteLabel}>오늘의 말씀 메모</div>
-        <textarea className={s.noteArea} rows={3} value={note}
-          onChange={e => setNoteMap({ ...noteMap, [todayKey]: e.target.value })}
+        <textarea className={s.noteArea} rows={3}
+          value={noteMap[todayKey] || ''}
+          onChange={e => updateNote(e.target.value)}
           placeholder="오늘 읽은 말씀 중 기억할 구절을 적어보세요..." />
       </div>
     </div>

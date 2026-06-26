@@ -44,16 +44,17 @@ function fmt(sec) {
 export default function Stats() {
   const [prayers, setPrayers] = useState([])
   const [journals, setJournals] = useState([])
-  const [readChapters] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('pb_read_chapters') || '{}') } catch { return {} }
-  })
+  const [readChapters, setReadChapters] = useState({})
   const [timerTotal, setTimerTotal] = useState(0)
 
   useEffect(() => {
     const u1 = onSnapshot(collection(db, 'prayers'), s => setPrayers(s.docs.map(d => ({ id: d.id, ...d.data() }))))
     const u2 = onSnapshot(collection(db, 'journals'), s => setJournals(s.docs.map(d => ({ id: d.id, ...d.data() }))))
     getDoc(doc(db, 'stats', 'timer')).then(d => { if (d.exists()) setTimerTotal(d.data().total || 0) })
-    return () => { u1(); u2() }
+    const u3 = onSnapshot(doc(db, 'bible', 'progress'), d => {
+      if (d.exists()) setReadChapters(d.data().readChapters || {})
+    })
+    return () => { u1(); u2(); u3() }
   }, [])
 
   const totalPrayers = prayers.length
