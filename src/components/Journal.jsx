@@ -1,7 +1,28 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { db } from '../firebase'
 import { collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc } from 'firebase/firestore'
 import s from './Journal.module.css'
+
+function SecItem({ label, val, s }) {
+  const [expanded, setExpanded] = React.useState(false)
+  const isLong = val && val.length > 150
+  return (
+    <div className={s.secItem}>
+      <div className={s.secLabel}>{label}</div>
+      <div className={s.secTextWrap}>
+        {isLong && !expanded
+          ? <p className={s.secTextClamped}>{val}</p>
+          : <p className={s.secTextFull}>{val}</p>
+        }
+        {isLong && (
+          <button className={s.moreBtn} onClick={() => setExpanded(e => !e)}>
+            {expanded ? '접기 ▲' : '더보기 ▼'}
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
 
 const SEC_LABELS = ['본문 말씀', '관주', '오늘의 묵상', '나눔과 실천', '기도']
 const SEC_KEYS = ['scripture', 'crossref', 'meditation', 'sharing', 'prayer']
@@ -144,10 +165,7 @@ export default function Journal() {
                   const val = j[SEC_KEYS[i]]
                   if (!val) return null
                   return (
-                    <div key={label} className={s.secItem}>
-                      <div className={s.secLabel}>{label}</div>
-                      <p className={s.secText}>{val}</p>
-                    </div>
+                    <SecItem key={label} label={label} val={val} s={s} />
                   )
                 })}
               </div>
