@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { db } from '../firebase'
 import { collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc, getDoc, setDoc } from 'firebase/firestore'
 import s from './Prayer.module.css'
@@ -25,7 +25,7 @@ export default function Prayer() {
   const [elapsed, setElapsed] = useState(0)
   const [isRunning, setIsRunning] = useState(false)
   const [completed, setCompleted] = useState(false)
-  const intervalRef = { current: null }
+  const intervalRef = React.useRef(null)
 
   useEffect(() => {
     getDoc(doc(db, 'stats', 'timer')).then(d => {
