@@ -2,6 +2,7 @@ import { useState } from 'react'
 import Prayer from './components/Prayer'
 import Bible from './components/Bible'
 import Journal from './components/Journal'
+import FamilyWorship from './components/FamilyWorship'
 import Stats from './components/Stats'
 import s from './App.module.css'
 
@@ -13,6 +14,7 @@ const TABS = [
   { id: 'prayer', label: '기도' },
   { id: 'bible', label: '통독' },
   { id: 'journal', label: '묵상' },
+  { id: 'family', label: '가정예배' },
   { id: 'stats', label: '통계' },
 ]
 
@@ -45,6 +47,7 @@ export default function App() {
         {tab === 'prayer'  && <Prayer />}
         {tab === 'bible'   && <Bible />}
         {tab === 'journal' && <Journal />}
+        {tab === 'family'  && <FamilyWorship />}
         {tab === 'stats'   && <Stats />}
       </div>
     </div>

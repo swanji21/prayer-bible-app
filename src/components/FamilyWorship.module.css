@@ -1,0 +1,72 @@
+.wrap { padding: 16px 0 8px; }
+
+.compose {
+  background: var(--bg);
+  border: 0.5px solid var(--border2);
+  border-radius: var(--radius-lg);
+  padding: 14px;
+  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.composeHeader { display: flex; flex-direction: column; gap: 8px; }
+
+.dateRow { display: flex; align-items: center; gap: 10px; }
+.dateLabel { font-size: 13px; color: var(--text2); white-space: nowrap; }
+.dateInput { flex: 1; padding: 8px 12px; font-size: 14px; background: var(--bg2); border: 0.5px solid var(--border); border-radius: var(--radius); color: var(--text); outline: none; }
+.dateInput:focus { border-color: var(--gold-mid); }
+
+.refInput { width: 100%; padding: 9px 12px; font-size: 14px; background: var(--bg2); border: 0.5px solid var(--border); border-radius: var(--radius); color: var(--text); outline: none; }
+.refInput:focus { border-color: var(--gold-mid); }
+
+.sectionBlock { display: flex; flex-direction: column; gap: 5px; }
+
+.sectionTag {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--navy);
+  padding: 4px 10px;
+  background: var(--gold-light);
+  border-left: 3px solid var(--gold);
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.sectionArea { width: 100%; padding: 9px 12px; font-size: 13px; background: var(--bg2); border: 0.5px solid var(--border); border-radius: var(--radius); color: var(--text); outline: none; line-height: 1.65; }
+.sectionArea:focus { border-color: var(--gold-mid); }
+
+.saveBtn { width: 100%; padding: 11px; background: var(--navy); color: var(--gold-mid); border: none; border-radius: var(--radius); font-size: 15px; font-weight: 600; margin-top: 2px; }
+.saveBtn:hover { opacity: 0.85; }
+
+.empty { text-align: center; color: var(--text2); font-size: 13px; padding: 32px 0; }
+
+.card { background: var(--bg2); border-radius: var(--radius); border: 0.5px solid var(--border); margin-bottom: 10px; overflow: hidden; }
+
+.cardTop { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px 8px; cursor: pointer; }
+.cardDate { font-size: 11px; color: var(--text2); margin-right: 8px; }
+.cardRef { font-size: 12px; color: var(--gold); font-weight: 600; }
+.cardRight { display: flex; align-items: center; gap: 8px; }
+.editBtn { background: transparent; border: none; color: var(--gold); font-size: 14px; opacity: 0.8; }
+.editBtn:hover { opacity: 1; }
+.delBtn { background: transparent; border: none; color: var(--text2); font-size: 18px; opacity: 0.5; }
+.delBtn:hover { opacity: 1; }
+.expandIcon { font-size: 10px; color: var(--text2); }
+
+.preview { font-size: 13px; color: var(--text2); padding: 0 14px 12px; line-height: 1.5; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+
+.sections { padding: 4px 14px 14px; display: flex; flex-direction: column; gap: 10px; }
+
+.secItem { display: flex; flex-direction: column; gap: 4px; }
+.secLabel { font-size: 11px; font-weight: 700; color: var(--navy); padding: 3px 8px; background: var(--gold-light); border-left: 3px solid var(--gold); border-radius: 4px; display: inline-block; margin-bottom: 2px; }
+.secTextWrap { position: relative; }
+.secTextClamped { font-size: 13px; color: var(--text); line-height: 1.7; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.secTextFull { font-size: 13px; color: var(--text); line-height: 1.7; white-space: pre-wrap; word-break: break-word; }
+.moreBtn { font-size: 12px; color: var(--gold); background: transparent; border: none; padding: 2px 0; margin-top: 2px; cursor: pointer; }
+
+.editHeader { padding: 12px 14px 0; display: flex; flex-direction: column; gap: 8px; }
+.editBody { padding: 0 14px 14px; display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+.editBtns { display: flex; gap: 8px; margin-top: 4px; }
+.cancelEditBtn { flex: 1; padding: 10px; border-radius: var(--radius); background: var(--bg2); border: 0.5px solid var(--border); color: var(--text2); font-size: 14px; }
+.saveEditBtn { flex: 1; padding: 10px; border-radius: var(--radius); background: var(--navy); border: none; color: var(--gold-mid); font-size: 14px; font-weight: 600; }
