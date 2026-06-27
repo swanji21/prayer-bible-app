@@ -46,6 +46,7 @@ export default function Bible() {
   const [showPlanModal, setShowPlanModal] = useState(false)
   const [newPlanName, setNewPlanName] = useState('')
   const [selectedBooks, setSelectedBooks] = useState([])
+  const [modalTab, setModalTab] = useState('구약')
 
   const todayKey = new Date().toISOString().slice(0, 10)
 
@@ -132,6 +133,17 @@ export default function Bible() {
     }
   }
 
+  const toggleSectionBooks = (section) => {
+    const sectionBooks = BIBLE_BOOKS[section].map(b => b.name)
+    const allSelected = sectionBooks.every(b => selectedBooks.includes(b))
+    
+    if (allSelected) {
+      setSelectedBooks(selectedBooks.filter(b => !sectionBooks.includes(b)))
+    } else {
+      setSelectedBooks([...new Set([...selectedBooks, ...sectionBooks])])
+    }
+  }
+
   const currentBooks = getPlanBooks(activePlan)
   const planTotal = currentBooks.reduce((a, b) => a + b.chapters, 0)
   const planRead = currentBooks.reduce((a, b) => a + (readChapters[b.name] || []).length, 0)
@@ -169,7 +181,7 @@ export default function Bible() {
             <button onClick={() => deletePlan(id)} style={{ position: 'absolute', right: '4px', top: '50%', transform: 'translateY(-50%)', width: '20px', height: '20px', border: 'none', background: 'transparent', color: 'var(--text2)', cursor: 'pointer', fontSize: '14px' }} title="삭제">✕</button>
           </div>
         ))}
-        <button className={s.planTab} onClick={() => setShowPlanModal(true)} style={{ fontSize: '18px', lineHeight: '1', padding: '8px 10px' }} title="계획 추가">+</button>
+        <button className={s.planTab} onClick={() => { setShowPlanModal(true); setModalTab('구약'); }} style={{ fontSize: '18px', lineHeight: '1', padding: '8px 10px' }} title="계획 추가">+</button>
       </div>
 
       <div className={s.sectionTabs}>
@@ -244,10 +256,25 @@ export default function Bible() {
           <div style={{ background: 'var(--bg)', borderRadius: '12px', padding: '20px', maxWidth: '500px', maxHeight: '80vh', overflow: 'auto', width: '90%' }}>
             <h3 style={{ marginTop: 0, marginBottom: '16px', color: 'var(--text)' }}>통독 계획 추가</h3>
             <input type="text" placeholder="계획명 (예: 1년 통독)" value={newPlanName} onChange={e => setNewPlanName(e.target.value)} style={{ width: '100%', padding: '10px', marginBottom: '16px', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: '14px', boxSizing: 'border-box' }} />
+            
             <div style={{ marginBottom: '16px' }}>
-              <div style={{ fontSize: '12px', color: 'var(--text2)', marginBottom: '10px' }}>성경책 선택 ({selectedBooks.length}권)</div>
-              <div style={{ maxHeight: '300px', overflowY: 'auto', border: '1px solid var(--border)', borderRadius: '6px', padding: '10px', background: 'var(--bg2)' }}>
-                {ALL_BOOKS.map(book => (
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                <button onClick={() => setModalTab('구약')} style={{ flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid var(--border)', background: modalTab === '구약' ? 'var(--navy)' : 'var(--bg2)', color: modalTab === '구약' ? 'var(--gold-mid)' : 'var(--text2)', cursor: 'pointer', fontSize: '13px', fontWeight: modalTab === '구약' ? '500' : '400' }}>구약 (66권)</button>
+                <button onClick={() => setModalTab('신약')} style={{ flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid var(--border)', background: modalTab === '신약' ? 'var(--navy)' : 'var(--bg2)', color: modalTab === '신약' ? 'var(--gold-mid)' : 'var(--text2)', cursor: 'pointer', fontSize: '13px', fontWeight: modalTab === '신약' ? '500' : '400' }}>신약 (27권)</button>
+              </div>
+              
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
+                <button onClick={() => toggleSectionBooks(modalTab)} style={{ flex: 1, padding: '6px 10px', borderRadius: '6px', border: '0.5px solid var(--gold)', background: 'transparent', color: 'var(--gold-mid)', cursor: 'pointer', fontSize: '12px', fontWeight: '500' }}>
+                  {BIBLE_BOOKS[modalTab].every(b => selectedBooks.includes(b.name)) ? '전체 해제' : '전체 선택'}
+                </button>
+              </div>
+
+              <div style={{ fontSize: '12px', color: 'var(--text2)', marginBottom: '8px' }}>
+                {modalTab} 선택 ({BIBLE_BOOKS[modalTab].filter(b => selectedBooks.includes(b.name)).length}/{BIBLE_BOOKS[modalTab].length})
+              </div>
+              
+              <div style={{ maxHeight: '250px', overflowY: 'auto', border: '1px solid var(--border)', borderRadius: '6px', padding: '10px', background: 'var(--bg2)' }}>
+                {BIBLE_BOOKS[modalTab].map(book => (
                   <label key={book.name} style={{ display: 'flex', alignItems: 'center', padding: '8px', cursor: 'pointer', fontSize: '13px', color: 'var(--text)' }}>
                     <input type="checkbox" checked={selectedBooks.includes(book.name)} onChange={e => { if (e.target.checked) { setSelectedBooks([...selectedBooks, book.name]) } else { setSelectedBooks(selectedBooks.filter(b => b !== book.name)) } }} style={{ marginRight: '8px', cursor: 'pointer' }} />
                     {book.name}
@@ -255,6 +282,11 @@ export default function Bible() {
                 ))}
               </div>
             </div>
+
+            <div style={{ fontSize: '12px', color: 'var(--text2)', marginBottom: '12px' }}>
+              총 선택: {selectedBooks.length}권
+            </div>
+
             <div style={{ display: 'flex', gap: '8px' }}>
               <button onClick={addPlan} style={{ flex: 1, padding: '10px', background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}>추가</button>
               <button onClick={() => setShowPlanModal(false)} style={{ flex: 1, padding: '10px', background: 'var(--bg2)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: '6px', cursor: 'pointer', fontSize: '14px' }}>취소</button>
