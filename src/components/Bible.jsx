@@ -32,7 +32,8 @@ const BIBLE_BOOKS = {
   ]
 }
 
-const TOTAL_CHAPTERS = Object.values(BIBLE_BOOKS).flat().reduce((a, b) => a + b.chapters, 0)
+const ALL_BOOKS = [...BIBLE_BOOKS['구약'], ...BIBLE_BOOKS['신약']]
+const TOTAL_CHAPTERS = ALL_BOOKS.reduce((a, b) => a + b.chapters, 0)
 
 export default function Bible() {
   const [readChapters, setReadChapters] = useState({})
@@ -40,25 +41,44 @@ export default function Bible() {
   const [activeSection, setActiveSection] = useState('구약')
   const [expandedBook, setExpandedBook] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [plans, setPlans] = useState({})
+  const [activePlan, setActivePlan] = useState('전체')
+  const [showPlanModal, setShowPlanModal] = useState(false)
+  const [newPlanName, setNewPlanName] = useState('')
+  const [selectedBooks, setSelectedBooks] = useState([])
 
   const todayKey = new Date().toISOString().slice(0, 10)
 
   useEffect(() => {
     const unsub = onSnapshot(doc(db, 'bible', 'progress'), d => {
       if (d.exists()) {
-        setReadChapters(d.data().readChapters || {})
-        setNoteMap(d.data().noteMap || {})
+        const data = d.data()
+        setReadChapters(data.readChapters || {})
+        setNoteMap(data.noteMap || {})
+        setPlans(data.plans || {})
       }
       setLoading(false)
     })
     return unsub
   }, [])
 
-  const saveToFirebase = async (newRead, newNotes) => {
+  const saveToFirebase = async (newRead, newNotes, newPlans = plans) => {
     await setDoc(doc(db, 'bible', 'progress'), {
       readChapters: newRead,
-      noteMap: newNotes
+      noteMap: newNotes,
+      plans: newPlans
     })
+  }
+
+  const getPlanBooks = (planId) => {
+    if (planId === '전체') return ALL_BOOKS
+    if (plans[planId]) {
+      return ALL_BOOKS.filter(b => {
+        const planBooks = plans[planId].books || []
+        return planBooks.includes(b.name)
+      })
+    }
+    return []
   }
 
   const toggleChapter = async (bookName, chNum) => {
@@ -84,25 +104,72 @@ export default function Bible() {
     await saveToFirebase(readChapters, newNotes)
   }
 
-  const totalRead = Object.values(readChapters).reduce((a, b) => a + b.length, 0)
-  const pct = Math.min(100, Math.round((totalRead / TOTAL_CHAPTERS) * 100))
+  const addPlan = async () => {
+    if (!newPlanName.trim() || selectedBooks.length === 0) {
+      alert('계획명과 성경책을 선택해주세요')
+      return
+    }
+    const planId = Date.now().toString()
+    const newPlans = {
+      ...plans,
+      [planId]: { name: newPlanName, books: selectedBooks, createdAt: new Date().toISOString() }
+    }
+    setPlans(newPlans)
+    await saveToFirebase(readChapters, noteMap, newPlans)
+    setNewPlanName('')
+    setSelectedBooks([])
+    setShowPlanModal(false)
+    setActivePlan(planId)
+  }
 
-  const books = BIBLE_BOOKS[activeSection]
-  const sectionTotal = books.reduce((a, b) => a + b.chapters, 0)
-  const sectionRead = books.reduce((a, b) => a + (readChapters[b.name] || []).length, 0)
-  const sectionPct = Math.round((sectionRead / sectionTotal) * 100)
+  const deletePlan = async (planId) => {
+    if (confirm('정말 삭제하시겠습니까?')) {
+      const newPlans = { ...plans }
+      delete newPlans[planId]
+      setPlans(newPlans)
+      await saveToFirebase(readChapters, noteMap, newPlans)
+      setActivePlan('전체')
+    }
+  }
+
+  const currentBooks = getPlanBooks(activePlan)
+  const planTotal = currentBooks.reduce((a, b) => a + b.chapters, 0)
+  const planRead = currentBooks.reduce((a, b) => a + (readChapters[b.name] || []).length, 0)
+  const planPct = planTotal > 0 ? Math.round((planRead / planTotal) * 100) : 0
+
+  const totalRead = Object.values(readChapters).reduce((a, b) => a + b.length, 0)
+  const totalPct = Math.min(100, Math.round((totalRead / TOTAL_CHAPTERS) * 100))
+
+  const books = currentBooks.filter(b => BIBLE_BOOKS[activeSection]?.some(sb => sb.name === b.name))
 
   if (loading) return <div className={s.loading}>불러오는 중...</div>
 
   return (
     <div className={s.wrap}>
       <div className={s.planHeader}>
-        <div className={s.planTitle}>전체 성경 통독 — 1,189장</div>
-        <div className={s.progBg}><div className={s.progFill} style={{ width: pct + '%' }} /></div>
-        <div className={s.planInfo}>
-          <span>{totalRead} / {TOTAL_CHAPTERS}장 읽음</span>
-          <span>{pct}% 완료</span>
+        <div className={s.planTitle}>
+          {activePlan === '전체' ? '전체 성경 통독 — 1,189장' : plans[activePlan]?.name || '계획'}
         </div>
+        <div className={s.progBg}>
+          <div className={s.progFill} style={{ width: (activePlan === '전체' ? totalPct : planPct) + '%' }} />
+        </div>
+        <div className={s.planInfo}>
+          <span>{activePlan === '전체' ? totalRead : planRead} / {activePlan === '전체' ? TOTAL_CHAPTERS : planTotal}장 읽음</span>
+          <span>{activePlan === '전체' ? totalPct : planPct}% 완료</span>
+        </div>
+      </div>
+
+      <div className={s.planTabs}>
+        <button className={activePlan === '전체' ? s.planTabActive : s.planTab} onClick={() => setActivePlan('전체')}>전체</button>
+        {Object.entries(plans).map(([id, plan]) => (
+          <div key={id} style={{ position: 'relative' }}>
+            <button className={activePlan === id ? s.planTabActive : s.planTab} onClick={() => setActivePlan(id)} style={{ paddingRight: '24px' }}>
+              {plan.name}
+            </button>
+            <button onClick={() => deletePlan(id)} style={{ position: 'absolute', right: '4px', top: '50%', transform: 'translateY(-50%)', width: '20px', height: '20px', border: 'none', background: 'transparent', color: 'var(--text2)', cursor: 'pointer', fontSize: '14px' }} title="삭제">✕</button>
+          </div>
+        ))}
+        <button className={s.planTab} onClick={() => setShowPlanModal(true)} style={{ fontSize: '18px', lineHeight: '1', padding: '8px 10px' }} title="계획 추가">+</button>
       </div>
 
       <div className={s.sectionTabs}>
@@ -120,8 +187,12 @@ export default function Bible() {
       </div>
 
       <div className={s.secProgress}>
-        <span className={s.secProgressTxt}>{activeSection} {sectionRead}/{sectionTotal}장</span>
-        <div className={s.progBg} style={{flex:1}}><div className={s.progFill} style={{width: sectionPct + '%'}} /></div>
+        <span className={s.secProgressTxt}>
+          {activeSection} {books.reduce((a,b)=>a+(readChapters[b.name]||[]).length,0)}/{books.reduce((a,b)=>a+b.chapters,0)}장
+        </span>
+        <div className={s.progBg} style={{flex:1}}>
+          <div className={s.progFill} style={{width: books.length > 0 ? Math.round((books.reduce((a,b)=>a+(readChapters[b.name]||[]).length,0) / books.reduce((a,b)=>a+b.chapters,0)) * 100) + '%' : '0%'}} />
+        </div>
       </div>
 
       <div className={s.bookList}>
@@ -167,6 +238,30 @@ export default function Bible() {
           onChange={e => updateNote(e.target.value)}
           placeholder="오늘 읽은 말씀 중 기억할 구절을 적어보세요..." />
       </div>
+
+      {showPlanModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div style={{ background: 'var(--bg)', borderRadius: '12px', padding: '20px', maxWidth: '500px', maxHeight: '80vh', overflow: 'auto', width: '90%' }}>
+            <h3 style={{ marginTop: 0, marginBottom: '16px', color: 'var(--text)' }}>통독 계획 추가</h3>
+            <input type="text" placeholder="계획명 (예: 1년 통독)" value={newPlanName} onChange={e => setNewPlanName(e.target.value)} style={{ width: '100%', padding: '10px', marginBottom: '16px', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: '14px', boxSizing: 'border-box' }} />
+            <div style={{ marginBottom: '16px' }}>
+              <div style={{ fontSize: '12px', color: 'var(--text2)', marginBottom: '10px' }}>성경책 선택 ({selectedBooks.length}권)</div>
+              <div style={{ maxHeight: '300px', overflowY: 'auto', border: '1px solid var(--border)', borderRadius: '6px', padding: '10px', background: 'var(--bg2)' }}>
+                {ALL_BOOKS.map(book => (
+                  <label key={book.name} style={{ display: 'flex', alignItems: 'center', padding: '8px', cursor: 'pointer', fontSize: '13px', color: 'var(--text)' }}>
+                    <input type="checkbox" checked={selectedBooks.includes(book.name)} onChange={e => { if (e.target.checked) { setSelectedBooks([...selectedBooks, book.name]) } else { setSelectedBooks(selectedBooks.filter(b => b !== book.name)) } }} style={{ marginRight: '8px', cursor: 'pointer' }} />
+                    {book.name}
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button onClick={addPlan} style={{ flex: 1, padding: '10px', background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}>추가</button>
+              <button onClick={() => setShowPlanModal(false)} style={{ flex: 1, padding: '10px', background: 'var(--bg2)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: '6px', cursor: 'pointer', fontSize: '14px' }}>취소</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
