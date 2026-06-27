@@ -32,8 +32,9 @@ const BIBLE_BOOKS = {
   ]
 }
 
+const ALL_BOOKS = [...BIBLE_BOOKS['구약'], ...BIBLE_BOOKS['신약']]
 const CATS = ['가족', '직장', '교회', '전도', '감사', '치유', '기타']
-const TOTAL_CHAPTERS = Object.values(BIBLE_BOOKS).flat().reduce((a, b) => a + b.chapters, 0)
+const TOTAL_CHAPTERS = ALL_BOOKS.reduce((a, b) => a + b.chapters, 0)
 const OT_TOTAL = BIBLE_BOOKS['구약'].reduce((a, b) => a + b.chapters, 0)
 const NT_TOTAL = BIBLE_BOOKS['신약'].reduce((a, b) => a + b.chapters, 0)
 
@@ -44,7 +45,9 @@ function fmt(sec) {
 export default function Stats() {
   const [prayers, setPrayers] = useState([])
   const [journals, setJournals] = useState([])
-  const [readChapters, setReadChapters] = useState({})
+  const [allProgress, setAllProgress] = useState({})
+  const [plans, setPlans] = useState({})
+  const [activePlanId, setActivePlanId] = useState('전체')
   const [timerTotal, setTimerTotal] = useState(0)
 
   useEffect(() => {
@@ -52,7 +55,10 @@ export default function Stats() {
     const u2 = onSnapshot(collection(db, 'journals'), s => setJournals(s.docs.map(d => ({ id: d.id, ...d.data() }))))
     getDoc(doc(db, 'stats', 'timer')).then(d => { if (d.exists()) setTimerTotal(d.data().total || 0) })
     const u3 = onSnapshot(doc(db, 'bible', 'progress'), d => {
-      if (d.exists()) setReadChapters(d.data().readChapters || {})
+      if (d.exists()) {
+        setAllProgress(d.data().allProgress || {})
+        setPlans(d.data().plans || {})
+      }
     })
     return () => { u1(); u2(); u3() }
   }, [])
@@ -67,13 +73,34 @@ export default function Stats() {
     done: prayers.filter(p => p.cat === cat && p.done).length,
   })).filter(c => c.total > 0)
 
-  const totalRead = Object.values(readChapters).reduce((a, b) => a + b.length, 0)
-  const biblePct = Math.round((totalRead / TOTAL_CHAPTERS) * 100)
-  const otRead = BIBLE_BOOKS['구약'].reduce((a, b) => a + (readChapters[b.name] || []).length, 0)
-  const ntRead = BIBLE_BOOKS['신약'].reduce((a, b) => a + (readChapters[b.name] || []).length, 0)
-  const otPct = Math.round((otRead / OT_TOTAL) * 100)
-  const ntPct = Math.round((ntRead / NT_TOTAL) * 100)
-  const completedBooks = Object.values(BIBLE_BOOKS).flat().filter(b => (readChapters[b.name] || []).length >= b.chapters)
+  // 계획별 통계 계산
+  const getPlanStats = (planId) => {
+    const readChapters = allProgress[planId] || {}
+    
+    if (planId === '전체') {
+      const totalRead = Object.values(readChapters).reduce((a, b) => a + b.length, 0)
+      const pct = Math.round((totalRead / TOTAL_CHAPTERS) * 100)
+      const otRead = BIBLE_BOOKS['구약'].reduce((a, b) => a + (readChapters[b.name] || []).length, 0)
+      const ntRead = BIBLE_BOOKS['신약'].reduce((a, b) => a + (readChapters[b.name] || []).length, 0)
+      const otPct = Math.round((otRead / OT_TOTAL) * 100)
+      const ntPct = Math.round((ntRead / NT_TOTAL) * 100)
+      const completedBooks = ALL_BOOKS.filter(b => (readChapters[b.name] || []).length >= b.chapters)
+      
+      return { totalRead, pct, otRead, ntRead, otPct, ntPct, completedBooks, total: TOTAL_CHAPTERS }
+    } else if (plans[planId]) {
+      const planBooks = plans[planId].books || []
+      const planBookList = ALL_BOOKS.filter(b => planBooks.includes(b.name))
+      const planTotal = planBookList.reduce((a, b) => a + b.chapters, 0)
+      const planRead = planBookList.reduce((a, b) => a + (readChapters[b.name] || []).length, 0)
+      const planPct = planTotal > 0 ? Math.round((planRead / planTotal) * 100) : 0
+      const completedBooks = planBookList.filter(b => (readChapters[b.name] || []).length >= b.chapters)
+      
+      return { totalRead: planRead, pct: planPct, otRead: 0, ntRead: 0, otPct: 0, ntPct: 0, completedBooks, total: planTotal }
+    }
+    return { totalRead: 0, pct: 0, otRead: 0, ntRead: 0, otPct: 0, ntPct: 0, completedBooks: [], total: 0 }
+  }
+
+  const stats = getPlanStats(activePlanId)
   const journalCount = journals.length
 
   return (
@@ -116,46 +143,80 @@ export default function Stats() {
       </div>
 
       <div className={s.cardTitle} style={{marginTop:16}}>성경 통독 통계</div>
+      
+      {/* 계획 탭 */}
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', overflowX: 'auto', scrollbarWidth: 'thin', paddingBottom: '4px' }}>
+        <button
+          onClick={() => setActivePlanId('전체')}
+          style={{
+            flexShrink: 0, padding: '8px 12px', borderRadius: '6px', border: '0.5px solid var(--border)',
+            background: activePlanId === '전체' ? 'var(--navy)' : 'var(--bg2)',
+            color: activePlanId === '전체' ? 'var(--gold-mid)' : 'var(--text2)',
+            fontSize: '13px', cursor: 'pointer', transition: 'all 0.15s', fontWeight: activePlanId === '전체' ? '500' : '400', whiteSpace: 'nowrap'
+          }}
+        >
+          전체
+        </button>
+        {Object.entries(plans).map(([id, plan]) => (
+          <button
+            key={id}
+            onClick={() => setActivePlanId(id)}
+            style={{
+              flexShrink: 0, padding: '8px 12px', borderRadius: '6px', border: '0.5px solid var(--border)',
+              background: activePlanId === id ? 'var(--navy)' : 'var(--bg2)',
+              color: activePlanId === id ? 'var(--gold-mid)' : 'var(--text2)',
+              fontSize: '13px', cursor: 'pointer', transition: 'all 0.15s', fontWeight: activePlanId === id ? '500' : '400', whiteSpace: 'nowrap'
+            }}
+          >
+            {plan.name}
+          </button>
+        ))}
+      </div>
+
       <div className={s.card}>
         <div className={s.statRow3}>
           <div className={s.statBox}>
-            <div className={s.statNum} style={{color:'var(--gold)'}}>{totalRead}</div>
+            <div className={s.statNum} style={{color:'var(--gold)'}}>{stats.totalRead}</div>
             <div className={s.statLbl}>읽은 장</div>
           </div>
           <div className={s.statBox}>
-            <div className={s.statNum}>{TOTAL_CHAPTERS - totalRead}</div>
+            <div className={s.statNum}>{stats.total - stats.totalRead}</div>
             <div className={s.statLbl}>남은 장</div>
           </div>
           <div className={s.statBox}>
-            <div className={s.statNum}>{completedBooks.length}</div>
+            <div className={s.statNum}>{stats.completedBooks.length}</div>
             <div className={s.statLbl}>완독 권</div>
           </div>
         </div>
         <div className={s.bigProgRow}>
           <div className={s.bigProgLabel}>
-            <span>전체 진행률</span>
-            <span className={s.bigProgPct}>{biblePct}%</span>
+            <span>{activePlanId === '전체' ? '전체 진행률' : '계획 진행률'}</span>
+            <span className={s.bigProgPct}>{stats.pct}%</span>
           </div>
-          <div className={s.bigProgBg}><div className={s.bigProgFill} style={{width: biblePct + '%'}} /></div>
+          <div className={s.bigProgBg}><div className={s.bigProgFill} style={{width: stats.pct + '%'}} /></div>
         </div>
-        <div className={s.catStats}>
-          <div className={s.catStatsLabel}>구약 / 신약</div>
-          <div className={s.catStatRow}>
-            <span className={s.catStatName}>구약</span>
-            <div className={s.catStatBar}><div className={s.catStatFill} style={{width: otPct + '%'}} /></div>
-            <span className={s.catStatCount}>{otRead}/{OT_TOTAL}</span>
+        
+        {activePlanId === '전체' && (
+          <div className={s.catStats}>
+            <div className={s.catStatsLabel}>구약 / 신약</div>
+            <div className={s.catStatRow}>
+              <span className={s.catStatName}>구약</span>
+              <div className={s.catStatBar}><div className={s.catStatFill} style={{width: stats.otPct + '%'}} /></div>
+              <span className={s.catStatCount}>{stats.otRead}/{OT_TOTAL}</span>
+            </div>
+            <div className={s.catStatRow}>
+              <span className={s.catStatName}>신약</span>
+              <div className={s.catStatBar}><div className={s.catStatFill} style={{width: stats.ntPct + '%'}} /></div>
+              <span className={s.catStatCount}>{stats.ntRead}/{NT_TOTAL}</span>
+            </div>
           </div>
-          <div className={s.catStatRow}>
-            <span className={s.catStatName}>신약</span>
-            <div className={s.catStatBar}><div className={s.catStatFill} style={{width: ntPct + '%'}} /></div>
-            <span className={s.catStatCount}>{ntRead}/{NT_TOTAL}</span>
-          </div>
-        </div>
-        {completedBooks.length > 0 && (
+        )}
+        
+        {stats.completedBooks.length > 0 && (
           <div className={s.completedBooks}>
             <div className={s.catStatsLabel}>완독한 책</div>
             <div className={s.bookChips}>
-              {completedBooks.map(b => <span key={b.name} className={s.bookChip}>{b.name}</span>)}
+              {stats.completedBooks.map(b => <span key={b.name} className={s.bookChip}>{b.name}</span>)}
             </div>
           </div>
         )}
