@@ -36,7 +36,7 @@ const ALL_BOOKS = [...BIBLE_BOOKS['구약'], ...BIBLE_BOOKS['신약']]
 const TOTAL_CHAPTERS = ALL_BOOKS.reduce((a, b) => a + b.chapters, 0)
 
 export default function Bible() {
-  const [readChapters, setReadChapters] = useState({})
+  const [allProgress, setAllProgress] = useState({})
   const [noteMap, setNoteMap] = useState({})
   const [activeSection, setActiveSection] = useState('구약')
   const [expandedBook, setExpandedBook] = useState(null)
@@ -54,7 +54,7 @@ export default function Bible() {
     const unsub = onSnapshot(doc(db, 'bible', 'progress'), d => {
       if (d.exists()) {
         const data = d.data()
-        setReadChapters(data.readChapters || {})
+        setAllProgress(data.allProgress || {})
         setNoteMap(data.noteMap || {})
         setPlans(data.plans || {})
       }
@@ -63,9 +63,9 @@ export default function Bible() {
     return unsub
   }, [])
 
-  const saveToFirebase = async (newRead, newNotes, newPlans = plans) => {
+  const saveToFirebase = async (newProgress, newNotes, newPlans = plans) => {
     await setDoc(doc(db, 'bible', 'progress'), {
-      readChapters: newRead,
+      allProgress: newProgress,
       noteMap: newNotes,
       plans: newPlans
     })
@@ -82,27 +82,41 @@ export default function Bible() {
     return []
   }
 
+  const getReadChapters = (planId) => {
+    return allProgress[planId] || {}
+  }
+
   const toggleChapter = async (bookName, chNum) => {
+    const readChapters = getReadChapters(activePlan)
     const prev = readChapters[bookName] || []
     const next = prev.includes(chNum) ? prev.filter(c => c !== chNum) : [...prev, chNum].sort((a,b)=>a-b)
-    const newRead = { ...readChapters, [bookName]: next }
-    setReadChapters(newRead)
-    await saveToFirebase(newRead, noteMap)
+    
+    const newProgress = {
+      ...allProgress,
+      [activePlan]: { ...readChapters, [bookName]: next }
+    }
+    setAllProgress(newProgress)
+    await saveToFirebase(newProgress, noteMap)
   }
 
   const markBookAll = async (bookName, chapters) => {
+    const readChapters = getReadChapters(activePlan)
     const all = Array.from({ length: chapters }, (_, i) => i + 1)
     const current = readChapters[bookName] || []
     const allDone = current.length >= chapters
-    const newRead = { ...readChapters, [bookName]: allDone ? [] : all }
-    setReadChapters(newRead)
-    await saveToFirebase(newRead, noteMap)
+    
+    const newProgress = {
+      ...allProgress,
+      [activePlan]: { ...readChapters, [bookName]: allDone ? [] : all }
+    }
+    setAllProgress(newProgress)
+    await saveToFirebase(newProgress, noteMap)
   }
 
   const updateNote = async (val) => {
     const newNotes = { ...noteMap, [todayKey]: val }
     setNoteMap(newNotes)
-    await saveToFirebase(readChapters, newNotes)
+    await saveToFirebase(allProgress, newNotes)
   }
 
   const addPlan = async () => {
@@ -116,7 +130,7 @@ export default function Bible() {
       [planId]: { name: newPlanName, books: selectedBooks, createdAt: new Date().toISOString() }
     }
     setPlans(newPlans)
-    await saveToFirebase(readChapters, noteMap, newPlans)
+    await saveToFirebase(allProgress, noteMap, newPlans)
     setNewPlanName('')
     setSelectedBooks([])
     setShowPlanModal(false)
@@ -127,8 +141,11 @@ export default function Bible() {
     if (confirm('정말 삭제하시겠습니까?')) {
       const newPlans = { ...plans }
       delete newPlans[planId]
+      const newProgress = { ...allProgress }
+      delete newProgress[planId]
       setPlans(newPlans)
-      await saveToFirebase(readChapters, noteMap, newPlans)
+      setAllProgress(newProgress)
+      await saveToFirebase(newProgress, noteMap, newPlans)
       setActivePlan('전체')
     }
   }
@@ -144,12 +161,14 @@ export default function Bible() {
     }
   }
 
+  const readChapters = getReadChapters(activePlan)
   const currentBooks = getPlanBooks(activePlan)
   const planTotal = currentBooks.reduce((a, b) => a + b.chapters, 0)
   const planRead = currentBooks.reduce((a, b) => a + (readChapters[b.name] || []).length, 0)
   const planPct = planTotal > 0 ? Math.round((planRead / planTotal) * 100) : 0
 
-  const totalRead = Object.values(readChapters).reduce((a, b) => a + b.length, 0)
+  const allReadChapters = allProgress['전체'] || {}
+  const totalRead = Object.values(allReadChapters).reduce((a, b) => a + b.length, 0)
   const totalPct = Math.min(100, Math.round((totalRead / TOTAL_CHAPTERS) * 100))
 
   const books = currentBooks.filter(b => BIBLE_BOOKS[activeSection]?.some(sb => sb.name === b.name))
