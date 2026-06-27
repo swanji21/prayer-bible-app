@@ -7,13 +7,11 @@
   "scope": "/",
   "theme_color": "#001f3f",
   "background_color": "#ffffff",
-  "orientation": "portrait-primary",
   "icons": [
     {
       "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect fill='%23001f3f' width='192' height='192' rx='45'/><rect x='54' y='42' width='84' height='108' fill='%23d4a55a' rx='6'/><line x1='96' y1='42' x2='96' y2='150' stroke='%23001f3f' stroke-width='4'/><line x1='66' y1='62' x2='84' y2='62' stroke='%23001f3f' stroke-width='3'/><line x1='66' y1='82' x2='84' y2='82' stroke='%23001f3f' stroke-width='3'/><line x1='66' y1='102' x2='84' y2='102' stroke='%23001f3f' stroke-width='3'/><line x1='108' y1='62' x2='126' y2='62' stroke='%23001f3f' stroke-width='3'/><line x1='108' y1='82' x2='126' y2='82' stroke='%23001f3f' stroke-width='3'/><line x1='108' y1='102' x2='126' y2='102' stroke='%23001f3f' stroke-width='3'/></svg>",
       "sizes": "192x192",
-      "type": "image/svg+xml",
-      "purpose": "any"
+      "type": "image/svg+xml"
     }
   ]
 }
