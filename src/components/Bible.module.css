@@ -20,7 +20,7 @@
 .secProgress { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
 .secProgressTxt { font-size: 12px; color: var(--text2); white-space: nowrap; }
 
-.bookList { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; max-height: 360px; overflow-y: auto; scrollbar-width: thin; }
+.bookList { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
 .bookItem { border-radius: var(--radius); overflow: hidden; border: 0.5px solid var(--border); }
 
 .bookRow {
