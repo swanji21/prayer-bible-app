@@ -111,3 +111,19 @@
 .completeBtn:hover { opacity: 0.85; }
 .timerDone { text-align: center; font-size: 13px; color: var(--gold-mid); margin-bottom: 10px; }
 .timerTotal { text-align: center; font-size: 11px; color: rgba(255,255,255,0.4); }
+
+.catHeader { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+.catSettingBtn { flex-shrink: 0; width: 32px; height: 32px; border-radius: 6px; border: 0.5px solid var(--border); background: var(--bg2); color: var(--text2); font-size: 16px; cursor: pointer; transition: all 0.15s; padding: 0; }
+.catSettingBtn:hover { border-color: var(--gold-mid); color: var(--text); }
+
+.edit { width: 24px; height: 24px; border: none; background: none; color: var(--text2); font-size: 14px; cursor: pointer; padding: 0; transition: all 0.15s; margin-right: 4px; }
+.edit:hover { color: var(--gold-mid); }
+
+.editItem { display: flex; gap: 8px; padding: 10px 12px; background: var(--bg2); border-radius: var(--radius); margin-bottom: 6px; align-items: center; }
+.editInput { flex: 1; background: var(--bg); border: 0.5px solid var(--border); border-radius: 6px; padding: 8px; font-size: 13px; color: var(--text); }
+.editSelect { background: var(--bg); border: 0.5px solid var(--border); border-radius: 6px; padding: 6px 8px; font-size: 12px; color: var(--text); width: 80px; }
+.editBtns { display: flex; gap: 6px; }
+.editSave { padding: 6px 10px; background: var(--navy); color: var(--gold-mid); border: none; border-radius: 4px; font-size: 12px; cursor: pointer; font-weight: 500; }
+.editCancel { padding: 6px 10px; background: var(--bg); border: 0.5px solid var(--border); color: var(--text2); border-radius: 4px; font-size: 12px; cursor: pointer; }
+
+.catManage { max-height: 300px; overflow-y: auto; }
