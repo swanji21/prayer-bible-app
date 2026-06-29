@@ -127,3 +127,10 @@
 .editCancel { padding: 6px 10px; background: var(--bg); border: 0.5px solid var(--border); color: var(--text2); border-radius: 4px; font-size: 12px; cursor: pointer; }
 
 .catManage { max-height: 300px; overflow-y: auto; }
+
+.verseHeader { display: flex; gap: 8px; align-items: flex-start; margin-bottom: 12px; }
+.verse { flex: 1; }
+.verseEditBtn { flex-shrink: 0; width: 32px; height: 32px; border-radius: 6px; border: 0.5px solid var(--border); background: var(--bg2); color: var(--text2); font-size: 16px; cursor: pointer; transition: all 0.15s; padding: 0; margin-top: 4px; }
+.verseEditBtn:hover { border-color: var(--gold-mid); color: var(--text); }
+
+.verseManage { max-height: 400px; overflow-y: auto; }

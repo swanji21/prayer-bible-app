@@ -3,7 +3,7 @@ import { db } from '../firebase'
 import { collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc, getDoc, setDoc } from 'firebase/firestore'
 import s from './Prayer.module.css'
 
-const VERSES = [
+const DEFAULT_VERSES = [
   { text: '아무것도 염려하지 말고 오직 모든 일에 기도와 간구로 너희 구할 것을 감사함으로 하나님께 아뢰라', ref: '빌립보서 4:6' },
   { text: '너는 내게 부르짖으라 내가 네게 응답하겠고 크고 은밀한 일을 네게 보이리라', ref: '예레미야 33:3' },
   { text: '구하라 그리하면 너희에게 주실 것이요 찾으라 그리하면 찾아낼 것이요', ref: '마태복음 7:7' },
@@ -17,21 +17,38 @@ function fmt(sec) {
 
 export default function Prayer() {
   const [prayers, setPrayers] = useState([])
+  const [verses, setVerses] = useState(DEFAULT_VERSES)
   const [cats, setCats] = useState(['전체', ...DEFAULT_CATS])
   const [activeCat, setActiveCat] = useState('전체')
   const [showModal, setShowModal] = useState(false)
   const [showCatModal, setShowCatModal] = useState(false)
+  const [showVerseModal, setShowVerseModal] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [editText, setEditText] = useState('')
   const [editCat, setEditCat] = useState('')
   const [newText, setNewText] = useState('')
   const [newCat, setNewCat] = useState('가족')
   const [newCatName, setNewCatName] = useState('')
+  const [newVerseText, setNewVerseText] = useState('')
+  const [newVerseRef, setNewVerseRef] = useState('')
+  const [editVerseId, setEditVerseId] = useState(null)
+  const [editVerseText, setEditVerseText] = useState('')
+  const [editVerseRef, setEditVerseRef] = useState('')
   const [totalSaved, setTotalSaved] = useState(0)
   const [elapsed, setElapsed] = useState(0)
   const [isRunning, setIsRunning] = useState(false)
   const [completed, setCompleted] = useState(false)
   const intervalRef = React.useRef(null)
+
+  // 말씀 로드
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'config', 'verses'), d => {
+      if (d.exists() && d.data().list) {
+        setVerses(d.data().list)
+      }
+    })
+    return unsub
+  }, [])
 
   // 카테고리 로드
   useEffect(() => {
@@ -81,6 +98,32 @@ export default function Prayer() {
     setCompleted(true)
   }
 
+  // 말씀 관리
+  const addVerse = async () => {
+    if (!newVerseText.trim() || !newVerseRef.trim()) return
+    const newList = verses.concat({ text: newVerseText.trim(), ref: newVerseRef.trim() })
+    setVerses(newList)
+    await setDoc(doc(db, 'config', 'verses'), { list: newList })
+    setNewVerseText('')
+    setNewVerseRef('')
+  }
+
+  const updateVerse = async () => {
+    if (!editVerseText.trim() || !editVerseRef.trim()) return
+    const newList = verses.map((v, i) => i === editVerseId ? { text: editVerseText.trim(), ref: editVerseRef.trim() } : v)
+    setVerses(newList)
+    await setDoc(doc(db, 'config', 'verses'), { list: newList })
+    setEditVerseId(null)
+  }
+
+  const deleteVerse = async (idx) => {
+    if (confirm('정말 삭제하시겠습니까?')) {
+      const newList = verses.filter((_, i) => i !== idx)
+      setVerses(newList)
+      await setDoc(doc(db, 'config', 'verses'), { list: newList })
+    }
+  }
+
   // 카테고리 관리
   const addCategory = async () => {
     if (!newCatName.trim()) return
@@ -127,7 +170,7 @@ export default function Prayer() {
     setShowModal(false)
   }
 
-  const verse = VERSES[new Date().getDate() % VERSES.length]
+  const verse = verses.length > 0 ? verses[new Date().getDate() % verses.length] : DEFAULT_VERSES[0]
   const filtered = activeCat === '전체' ? prayers : prayers.filter(p => p.cat === activeCat)
   const doneCount = prayers.filter(p => p.done).length
   const filteredDone = filtered.filter(p => p.done).length
@@ -135,9 +178,12 @@ export default function Prayer() {
 
   return (
     <div className={s.wrap}>
-      <div className={s.verse}>
-        <p>"{verse.text}"</p>
-        <span>{verse.ref}</span>
+      <div className={s.verseHeader}>
+        <div className={s.verse}>
+          <p>"{verse.text}"</p>
+          <span>{verse.ref}</span>
+        </div>
+        <button className={s.verseEditBtn} onClick={() => setShowVerseModal(true)} title="말씀 관리">⚙️</button>
       </div>
 
       <div className={s.catHeader}>
@@ -248,6 +294,55 @@ export default function Prayer() {
             </div>
             <div className={s.sheetBtns}>
               <button className={s.confirmBtn} onClick={() => setShowCatModal(false)} style={{width: '100%'}}>닫기</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showVerseModal && (
+        <div className={s.overlay} onClick={() => setShowVerseModal(false)}>
+          <div className={s.sheet} onClick={e => e.stopPropagation()}>
+            <div className={s.sheetTitle}>말씀 관리</div>
+            <div className={s.verseManage}>
+              {editVerseId !== null ? (
+                <div style={{padding: '12px', background: 'var(--bg2)', borderRadius: '6px', marginBottom: '12px'}}>
+                  <textarea className={s.sheetInput} value={editVerseText} onChange={e => setEditVerseText(e.target.value)}
+                    placeholder="말씀 내용" style={{marginBottom: '8px'}} />
+                  <input className={s.sheetInput} value={editVerseRef} onChange={e => setEditVerseRef(e.target.value)}
+                    placeholder="성경 참고 (예: 빌립보서 4:6)" style={{marginBottom: '8px'}} />
+                  <div style={{display: 'flex', gap: '8px'}}>
+                    <button className={s.confirmBtn} onClick={updateVerse} style={{flex: 1}}>저장</button>
+                    <button className={s.cancelBtn} onClick={() => setEditVerseId(null)} style={{flex: 1}}>취소</button>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <textarea className={s.sheetInput} value={newVerseText} onChange={e => setNewVerseText(e.target.value)}
+                    placeholder="새 말씀 내용" style={{marginBottom: '8px'}} />
+                  <input className={s.sheetInput} value={newVerseRef} onChange={e => setNewVerseRef(e.target.value)}
+                    placeholder="성경 참고 (예: 빌립보서 4:6)" style={{marginBottom: '8px'}} />
+                  <button className={s.confirmBtn} onClick={addVerse} style={{width: '100%', marginBottom: '12px'}}>말씀 추가</button>
+                </div>
+              )}
+
+              <div style={{borderTop: '1px solid var(--border)', paddingTop: '12px'}}>
+                <div style={{fontSize: '12px', color: 'var(--text2)', marginBottom: '10px'}}>등록된 말씀</div>
+                {verses.map((v, idx) => (
+                  <div key={idx} style={{padding: '10px', background: 'var(--bg2)', borderRadius: '6px', marginBottom: '6px', fontSize: '12px'}}>
+                    <div style={{color: 'var(--text)', marginBottom: '4px', lineHeight: '1.5'}}>"{v.text}"</div>
+                    <div style={{color: 'var(--text2)', fontSize: '11px', marginBottom: '6px'}}>{v.ref}</div>
+                    <div style={{display: 'flex', gap: '6px'}}>
+                      <button onClick={() => { setEditVerseId(idx); setEditVerseText(v.text); setEditVerseRef(v.ref) }} 
+                        style={{flex: 1, padding: '4px', background: 'var(--navy)', color: 'var(--gold-mid)', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px'}}>수정</button>
+                      <button onClick={() => deleteVerse(idx)} 
+                        style={{flex: 1, padding: '4px', background: 'transparent', color: 'var(--text2)', border: '0.5px solid var(--border)', borderRadius: '4px', cursor: 'pointer', fontSize: '11px'}}>삭제</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className={s.sheetBtns}>
+              <button className={s.confirmBtn} onClick={() => setShowVerseModal(false)} style={{width: '100%'}}>닫기</button>
             </div>
           </div>
         </div>
