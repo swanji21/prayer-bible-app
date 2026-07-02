@@ -7,12 +7,19 @@
   "scope": "/",
   "theme_color": "#001f3f",
   "background_color": "#ffffff",
+  "categories": ["productivity"],
   "icons": [
     {
-      "src": "/public/icon.png",
-      "sizes": "512x512",
+      "src": "/icon.png",
+      "sizes": "192x192 512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icon.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }
