@@ -9,9 +9,10 @@
   "background_color": "#ffffff",
   "icons": [
     {
-      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect fill='%23001f3f' width='192' height='192' rx='45'/><g><path d='M 64 60 L 96 60 L 96 140 Q 96 150 86 150 L 64 150 Z' fill='%23d4a55a' stroke='%23001f3f' stroke-width='2'/><path d='M 96 60 L 128 60 L 128 150 Q 128 150 118 150 L 96 140 Z' fill='%23c4985a' stroke='%23001f3f' stroke-width='2'/><line x1='96' y1='60' x2='96' y2='150' stroke='%23001f3f' stroke-width='1.5'/><line x1='72' y1='75' x2='92' y2='75' stroke='%23001f3f' stroke-width='1'/><line x1='72' y1='95' x2='92' y2='95' stroke='%23001f3f' stroke-width='1'/><line x1='72' y1='115' x2='92' y2='115' stroke='%23001f3f' stroke-width='1'/><line x1='100' y1='75' x2='120' y2='75' stroke='%23001f3f' stroke-width='1'/><line x1='100' y1='95' x2='120' y2='95' stroke='%23001f3f' stroke-width='1'/><line x1='100' y1='115' x2='120' y2='115' stroke='%23001f3f' stroke-width='1'/></g><g><path d='M 86 65 Q 80 55 75 48 Q 70 55 64 65' fill='none' stroke='%23d4a55a' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/><path d='M 106 65 Q 112 55 117 48 Q 122 55 128 65' fill='none' stroke='%23d4a55a' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/><circle cx='96' cy='75' r='6' fill='%23d4a55a'/></g></svg>",
-      "sizes": "192x192",
-      "type": "image/svg+xml"
+      "src": "/public/icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
 }
