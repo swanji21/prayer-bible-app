@@ -47,6 +47,7 @@ export default function Bible() {
   const [newPlanName, setNewPlanName] = useState('')
   const [selectedBooks, setSelectedBooks] = useState([])
   const [modalTab, setModalTab] = useState('구약')
+  const [completionCount, setCompletionCount] = useState(0)
 
   const todayKey = new Date().toISOString().slice(0, 10)
 
@@ -59,6 +60,15 @@ export default function Bible() {
         setPlans(data.plans || {})
       }
       setLoading(false)
+    })
+    return unsub
+  }, [])
+
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'stats', 'bibleStats'), d => {
+      if (d.exists()) {
+        setCompletionCount(d.data().totalCompletions || 0)
+      }
     })
     return unsub
   }, [])
@@ -101,16 +111,37 @@ export default function Bible() {
 
   const markBookAll = async (bookName, chapters) => {
     const readChapters = getReadChapters(activePlan)
-    const all = Array.from({ length: chapters }, (_, i) => i + 1)
     const current = readChapters[bookName] || []
     const allDone = current.length >= chapters
     
-    const newProgress = {
-      ...allProgress,
-      [activePlan]: { ...readChapters, [bookName]: allDone ? [] : all }
+    // 책을 완독하려고 할 때
+    if (!allDone) {
+      const all = Array.from({ length: chapters }, (_, i) => i + 1)
+      const newProgress = {
+        ...allProgress,
+        [activePlan]: { ...readChapters, [bookName]: all }
+      }
+      setAllProgress(newProgress)
+      await saveToFirebase(newProgress, noteMap)
+      
+      // 누적 횟수 증가
+      const newCount = completionCount + 1
+      setCompletionCount(newCount)
+      await setDoc(doc(db, 'stats', 'bibleStats'), { totalCompletions: newCount })
+    } else {
+      // 초기화하려고 할 때
+      const newProgress = {
+        ...allProgress,
+        [activePlan]: { ...readChapters, [bookName]: [] }
+      }
+      setAllProgress(newProgress)
+      await saveToFirebase(newProgress, noteMap)
+      
+      // 누적 횟수 감소
+      const newCount = Math.max(0, completionCount - 1)
+      setCompletionCount(newCount)
+      await setDoc(doc(db, 'stats', 'bibleStats'), { totalCompletions: newCount })
     }
-    setAllProgress(newProgress)
-    await saveToFirebase(newProgress, noteMap)
   }
 
   const updateNote = async (val) => {
@@ -187,6 +218,9 @@ export default function Bible() {
         <div className={s.planInfo}>
           <span>{activePlan === '전체' ? totalRead : planRead} / {activePlan === '전체' ? TOTAL_CHAPTERS : planTotal}장 읽음</span>
           <span>{activePlan === '전체' ? totalPct : planPct}% 완료</span>
+        </div>
+        <div style={{fontSize: '12px', color: 'var(--gold-mid)', marginTop: '6px'}}>
+          📚 완독한 책: {completionCount}권
         </div>
       </div>
 
