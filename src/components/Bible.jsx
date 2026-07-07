@@ -60,6 +60,9 @@ export default function Bible() {
       }
       setLoading(false)
     })
+    const unsub2 = onSnapshot(doc(db, 'stats', 'bibleStats'), d => {
+      if (d.exists()) setTotalCompletions(d.data().totalCompletions || 0)
+    })
     return unsub
   }, [])
 
@@ -188,6 +191,7 @@ export default function Bible() {
           <span>{activePlan === '전체' ? totalRead : planRead} / {activePlan === '전체' ? TOTAL_CHAPTERS : planTotal}장 읽음</span>
           <span>{activePlan === '전체' ? totalPct : planPct}% 완료</span>
         </div>
+        <div style={{ textAlign: 'center', color: 'var(--text2)', fontSize: '13px', marginTop: '6px' }}>📚 완독한 책: {totalCompletions}권</div>
       </div>
 
       <div className={s.planTabs}>
