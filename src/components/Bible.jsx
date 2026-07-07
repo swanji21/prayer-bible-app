@@ -184,7 +184,6 @@ export default function Bible() {
         <div className={s.progBg}>
           <div className={s.progFill} style={{ width: (activePlan === '전체' ? totalPct : planPct) + '%' }} />
         </div>
-        <div style={{ textAlign: 'center', color: 'var(--text2)', fontSize: '13px', marginBottom: '8px' }}>📚 완독한 책: {totalCompletions}권</div>
         <div className={s.planInfo}>
           <span>{activePlan === '전체' ? totalRead : planRead} / {activePlan === '전체' ? TOTAL_CHAPTERS : planTotal}장 읽음</span>
           <span>{activePlan === '전체' ? totalPct : planPct}% 완료</span>
