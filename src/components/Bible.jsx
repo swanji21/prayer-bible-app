@@ -83,33 +83,6 @@ export default function Bible() {
     await saveToFirebase(newProgress, noteMap, plans, newCompletions)
   }
 
-  const shareText = async (text, title) => {
-    try {
-      if (navigator.share) {
-        await navigator.share({ title, text })
-      } else {
-        await navigator.clipboard.writeText(text)
-        alert('클립보드에 복사되었습니다')
-      }
-    } catch (e) { /* 사용자가 공유 취소 */ }
-  }
-
-  const printContent = (title, html) => {
-    const w = window.open('', '_blank')
-    if (!w) { alert('팝업이 차단되어 있어요. 팝업을 허용해주세요.'); return }
-    w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + title + '</title>' +
-      '<style>body{font-family:-apple-system,"Apple SD Gothic Neo",sans-serif;padding:24px;color:#222;max-width:700px;margin:0 auto}' +
-      'h1{font-size:20px;border-bottom:2px solid #001f3f;padding-bottom:8px}' +
-      'h2{font-size:15px;color:#001f3f;margin:16px 0 4px}' +
-      'p{margin:4px 0;font-size:14px;line-height:1.6;white-space:pre-wrap}' +
-      'table{border-collapse:collapse;width:100%;font-size:13px;margin-top:12px}' +
-      'td,th{border:1px solid #ccc;padding:6px 8px;text-align:left}' +
-      '.meta{color:#777;font-size:12px}</style></head><body>' + html + '</body></html>')
-    w.document.close()
-    w.focus()
-    setTimeout(() => w.print(), 300)
-  }
-
   const getPlanBooks = (planId) => {
     if (planId === '전체') return ALL_BOOKS
     if (plans[planId]) {
@@ -219,29 +192,6 @@ export default function Bible() {
   const isComplete = curTotal > 0 && curRead >= curTotal
   const planName = activePlan === '전체' ? '전체 성경 통독' : (plans[activePlan]?.name || '계획')
 
-  const buildBibleText = () => {
-    const doneBooks = currentBooks.filter(b => (readChapters[b.name] || []).length >= b.chapters).map(b => b.name)
-    let text = '📖 성경 통독 현황 — ' + planName + '\n'
-    text += '진행: ' + curRead + '/' + curTotal + '장 (' + curPct + '%)\n'
-    if (curCompletions > 0) text += '🏆 완독 누적: ' + curCompletions + '회\n'
-    if (doneBooks.length > 0) text += '완독한 책 (' + doneBooks.length + '권): ' + doneBooks.join(', ')
-    return text
-  }
-
-  const printBible = () => {
-    const rows = currentBooks.map(b => {
-      const cnt = (readChapters[b.name] || []).length
-      const pct = Math.round((cnt / b.chapters) * 100)
-      return '<tr><td>' + b.name + '</td><td>' + cnt + '/' + b.chapters + '장</td><td>' + pct + '%</td></tr>'
-    }).join('')
-    const html = '<h1>📖 성경 통독 현황 — ' + planName + '</h1>' +
-      '<p class="meta">' + new Date().toLocaleDateString('ko-KR') + ' 기준</p>' +
-      '<p>진행: ' + curRead + '/' + curTotal + '장 (' + curPct + '%)' +
-      (curCompletions > 0 ? ' · 🏆 완독 누적 ' + curCompletions + '회' : '') + '</p>' +
-      '<table><tr><th>성경</th><th>읽음</th><th>진행률</th></tr>' + rows + '</table>'
-    printContent('성경 통독 현황', html)
-  }
-
   if (loading) return <div className={s.loading}>불러오는 중...</div>
 
   return (
@@ -258,19 +208,13 @@ export default function Bible() {
           <span>{curRead} / {curTotal}장 읽음</span>
           <span>{curPct}% 완료</span>
         </div>
-        <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
-          {isComplete && (
-            <button onClick={recordCompletion} style={{ flex: 1, padding: '9px', background: 'var(--gold-mid, #d4a55a)', color: '#001f3f', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '700' }}>
+        {isComplete && (
+          <div style={{ marginTop: '10px' }}>
+            <button onClick={recordCompletion} style={{ width: '100%', padding: '9px', background: 'var(--gold-mid, #d4a55a)', color: '#001f3f', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '700' }}>
               🎉 완독 기록하고 새로 시작
             </button>
-          )}
-          <button onClick={() => shareText(buildBibleText(), '성경 통독 현황')} style={{ flex: isComplete ? 'none' : 1, padding: '9px 14px', background: 'transparent', color: 'var(--text2)', border: '1px solid var(--border)', borderRadius: '8px', cursor: 'pointer', fontSize: '13px' }}>
-            📤 공유
-          </button>
-          <button onClick={printBible} style={{ flex: isComplete ? 'none' : 1, padding: '9px 14px', background: 'transparent', color: 'var(--text2)', border: '1px solid var(--border)', borderRadius: '8px', cursor: 'pointer', fontSize: '13px' }}>
-            🖨 프린트
-          </button>
-        </div>
+          </div>
+        )}
       </div>
 
       <div className={s.planTabs}>
