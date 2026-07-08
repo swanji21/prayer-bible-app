@@ -47,6 +47,7 @@ export default function Journal() {
   const [editingId, setEditingId] = useState(null)
   const [editForm, setEditForm] = useState(emptyForm)
   const [editDate, setEditDate] = useState('')
+  const [monthOpen, setMonthOpen] = useState({})
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'journals'), snap => {
@@ -94,6 +95,20 @@ export default function Journal() {
   }
 
   const sorted = [...journals].sort((a, b) => b.date.localeCompare(a.date))
+
+  const monthGroups = []
+  sorted.forEach(j => {
+    const key = (j.date || '').slice(0, 7)
+    let g = monthGroups.find(x => x.key === key)
+    if (!g) { g = { key, items: [] }; monthGroups.push(g) }
+    g.items.push(j)
+  })
+
+  const monthLabel = (key) => {
+    const parts = key.split('.')
+    if (parts.length < 2) return key
+    return parts[0] + '년 ' + parseInt(parts[1], 10) + '월'
+  }
 
   const buildJournalText = (j) => {
     let t = '📖 묵상 — ' + j.date + '\n'
@@ -159,7 +174,17 @@ export default function Journal() {
 
       {journals.length === 0 && <div className={s.empty}>아직 묵상 기록이 없어요</div>}
 
-      {sorted.map(j => {
+      {monthGroups.map((g, gi) => {
+        const isMonthOpen = monthOpen[g.key] !== undefined ? monthOpen[g.key] : gi === 0
+        return (
+          <div key={g.key}>
+            <button
+              onClick={() => setMonthOpen(m => ({ ...m, [g.key]: !isMonthOpen }))}
+              style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '11px 14px', margin: '14px 0 8px', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '10px', cursor: 'pointer', fontSize: '14px', fontWeight: '700', color: 'var(--text)' }}>
+              <span>📅 {monthLabel(g.key)}</span>
+              <span style={{ fontSize: '12px', fontWeight: '400', color: 'var(--text2)' }}>{g.items.length}건 {isMonthOpen ? '▲' : '▼'}</span>
+            </button>
+            {isMonthOpen && g.items.map(j => {
         const isOpen = expandedId === j.id
         const isEditing = editingId === j.id
 
@@ -216,6 +241,9 @@ export default function Journal() {
                 })}
               </div>
             )}
+          </div>
+        )
+      })}
           </div>
         )
       })}
