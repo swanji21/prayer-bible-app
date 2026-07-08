@@ -90,6 +90,46 @@ export default function FamilyWorship() {
 
   const sorted = [...records].sort((a, b) => b.date.localeCompare(a.date))
 
+  const buildWorshipText = (r) => {
+    let t = '🏠 가정예배 — ' + r.date + '\n'
+    if (r.ref) t += '본문: ' + r.ref + '\n'
+    t += '\n'
+    SECTIONS.forEach(sec => {
+      if (r[sec.key]) t += '[' + sec.label + ']\n' + r[sec.key] + '\n\n'
+    })
+    return t.trim()
+  }
+
+  const shareRecord = async (r) => {
+    const text = buildWorshipText(r)
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: '가정예배 ' + r.date, text })
+      } else {
+        await navigator.clipboard.writeText(text)
+        alert('클립보드에 복사되었습니다')
+      }
+    } catch (e) { /* 사용자가 공유 취소 */ }
+  }
+
+  const printRecord = (r) => {
+    const w = window.open('', '_blank')
+    if (!w) { alert('팝업이 차단되어 있어요. 팝업을 허용해주세요.'); return }
+    const body = SECTIONS.map(sec => r[sec.key] ? '<h2>' + sec.label + '</h2><p>' + r[sec.key].replace(/</g, '&lt;').replace(/\n/g, '<br>') + '</p>' : '').join('')
+    w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>가정예배 ' + r.date + '</title>' +
+      '<style>body{font-family:-apple-system,"Apple SD Gothic Neo",sans-serif;padding:28px;color:#222;max-width:700px;margin:0 auto}' +
+      'h1{font-size:20px;border-bottom:2px solid #001f3f;padding-bottom:8px}' +
+      'h2{font-size:15px;color:#001f3f;margin:18px 0 4px;border-left:3px solid #d4a55a;padding-left:8px}' +
+      'p{margin:4px 0;font-size:14px;line-height:1.7}' +
+      '.meta{color:#777;font-size:13px;margin-bottom:8px}</style></head><body>' +
+      '<h1>🏠 가정예배</h1>' +
+      '<p class="meta">' + r.date + (r.ref ? ' · 본문: ' + r.ref : '') + '</p>' +
+      body + '</body></html>')
+    w.document.close()
+    w.focus()
+    setTimeout(() => w.print(), 300)
+  }
+
   return (
     <div className={s.wrap}>
       <div className={s.compose}>
@@ -150,6 +190,8 @@ export default function FamilyWorship() {
                 {r.ref && <span className={s.cardRef}>{r.ref}</span>}
               </div>
               <div className={s.cardRight}>
+                <button className={s.editBtn} onClick={e => { e.stopPropagation(); shareRecord(r) }} title="공유">📤</button>
+                <button className={s.editBtn} onClick={e => { e.stopPropagation(); printRecord(r) }} title="프린트">🖨</button>
                 <button className={s.editBtn} onClick={e => { e.stopPropagation(); startEdit(r) }}>✏</button>
                 <button className={s.delBtn} onClick={e => { e.stopPropagation(); deleteRecord(r.id) }}>x</button>
                 <span className={s.expandIcon}>{isOpen ? 'A' : 'V'}</span>
