@@ -28,6 +28,8 @@ export default function Prayer() {
   const [elapsed, setElapsed] = useState(0)
   const [isRunning, setIsRunning] = useState(false)
   const [completed, setCompleted] = useState(false)
+  const startRef = React.useRef(null)      // 타이머가 돌기 시작한 시각 (ms)
+  const accumRef = React.useRef(0)          // 일시정지 전까지 누적된 초
   const intervalRef = React.useRef(null)
 
   useEffect(() => {
@@ -85,21 +87,87 @@ export default function Prayer() {
     return () => clearInterval(intervalRef.current)
   }, [])
 
-  const start = () => {
-    setCompleted(false)
-    intervalRef.current = setInterval(() => setElapsed(e => e + 1), 1000)
-    setIsRunning(true)
+  // 현재 경과 시간을 실제 시각 기준으로 다시 계산
+  const recompute = () => {
+    if (startRef.current != null) {
+      const now = Date.now()
+      setElapsed(accumRef.current + Math.floor((now - startRef.current) / 1000))
+    }
   }
 
-  const stop = () => { clearInterval(intervalRef.current); setIsRunning(false) }
+  const wakeLockRef = React.useRef(null)
+
+  const requestWakeLock = async () => {
+    try {
+      if ('wakeLock' in navigator) {
+        wakeLockRef.current = await navigator.wakeLock.request('screen')
+      }
+    } catch (e) { /* 지원 안 하거나 거부됨 — 무시 */ }
+  }
+
+  const releaseWakeLock = async () => {
+    try { if (wakeLockRef.current) { await wakeLockRef.current.release(); wakeLockRef.current = null } } catch (e) {}
+  }
+
+  // 백그라운드에서 돌아왔을 때(다른 앱→앱 복귀) 즉시 시간 보정
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        recompute()
+        if (isRunning) requestWakeLock()   // 복귀 시 wake lock 재획득
+      }
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('focus', onVisible)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('focus', onVisible)
+    }
+  }, [isRunning])
+
+  const start = () => {
+    setCompleted(false)
+    startRef.current = Date.now()
+    clearInterval(intervalRef.current)
+    intervalRef.current = setInterval(recompute, 1000)
+    setIsRunning(true)
+    requestWakeLock()
+  }
+
+  const stop = () => {
+    clearInterval(intervalRef.current)
+    if (startRef.current != null) {
+      accumRef.current += Math.floor((Date.now() - startRef.current) / 1000)
+      startRef.current = null
+    }
+    setElapsed(accumRef.current)
+    setIsRunning(false)
+    releaseWakeLock()
+  }
 
   const toggle = () => { if (isRunning) { stop() } else { start() } }
 
-  const reset = () => { stop(); setElapsed(0); setCompleted(false) }
+  const reset = () => {
+    clearInterval(intervalRef.current)
+    startRef.current = null
+    accumRef.current = 0
+    setElapsed(0)
+    setIsRunning(false)
+    setCompleted(false)
+    releaseWakeLock()
+  }
 
   const complete = async () => {
-    stop()
-    const newTotal = totalSaved + elapsed
+    clearInterval(intervalRef.current)
+    let secs = accumRef.current
+    if (startRef.current != null) {
+      secs += Math.floor((Date.now() - startRef.current) / 1000)
+    }
+    startRef.current = null
+    accumRef.current = 0
+    setIsRunning(false)
+    releaseWakeLock()
+    const newTotal = totalSaved + secs
     setTotalSaved(newTotal)
     await setDoc(doc(db, 'stats', 'timer'), { total: newTotal })
     setElapsed(0)
