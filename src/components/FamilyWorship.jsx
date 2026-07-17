@@ -130,13 +130,20 @@ export default function FamilyWorship() {
   const printRecord = (r) => {
     const w = window.open('', '_blank')
     if (!w) { alert('팝업이 차단되어 있어요. 팝업을 허용해주세요.'); return }
-    const body = SECTIONS.map(sec => r[sec.key] ? '<h2>' + sec.label + '</h2><p>' + r[sec.key].replace(/</g, '&lt;').replace(/\n/g, '<br>') + '</p>' : '').join('')
+    const body = SECTIONS.map(sec => {
+      const val = r[sec.key]
+      const content = val
+        ? val.replace(/</g, '&lt;').replace(/\n/g, '<br>')
+        : '<span class="empty">—</span>'
+      return '<h2>' + sec.label + '</h2><p>' + content + '</p>'
+    }).join('')
     w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>가정예배 ' + r.date + '</title>' +
       '<style>body{font-family:-apple-system,"Apple SD Gothic Neo",sans-serif;padding:28px;color:#222;max-width:700px;margin:0 auto}' +
       'h1{font-size:20px;border-bottom:2px solid #001f3f;padding-bottom:8px}' +
       'h2{font-size:15px;color:#001f3f;margin:18px 0 4px;border-left:3px solid #d4a55a;padding-left:8px}' +
       'p{margin:4px 0;font-size:14px;line-height:1.7}' +
-      '.meta{color:#777;font-size:13px;margin-bottom:8px}</style></head><body>' +
+      '.meta{color:#777;font-size:13px;margin-bottom:8px}' +
+      '.empty{color:#bbb}</style></head><body>' +
       '<h1>🏠 가정예배</h1>' +
       '<p class="meta">' + r.date + (r.ref ? ' · 본문: ' + r.ref : '') + '</p>' +
       body + '</body></html>')
