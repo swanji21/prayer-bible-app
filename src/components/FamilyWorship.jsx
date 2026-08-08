@@ -137,19 +137,29 @@ export default function FamilyWorship() {
         : '<span class="empty">—</span>'
       return '<h2>' + sec.label + '</h2><p>' + content + '</p>'
     }).join('')
-    w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>가정예배 ' + r.date + '</title>' +
-      '<style>body{font-family:-apple-system,"Apple SD Gothic Neo",sans-serif;padding:28px;color:#222;max-width:700px;margin:0 auto}' +
+    w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>가정예배 ' + r.date + '</title>' +
+      '<style>body{font-family:-apple-system,"Apple SD Gothic Neo",sans-serif;padding:0;color:#222;margin:0}' +
+      '.content{padding:28px;max-width:700px;margin:0 auto}' +
       'h1{font-size:20px;border-bottom:2px solid #001f3f;padding-bottom:8px}' +
       'h2{font-size:15px;color:#001f3f;margin:18px 0 4px;border-left:3px solid #d4a55a;padding-left:8px}' +
       'p{margin:4px 0;font-size:14px;line-height:1.7}' +
       '.meta{color:#777;font-size:13px;margin-bottom:8px}' +
-      '.empty{color:#bbb}</style></head><body>' +
+      '.empty{color:#bbb}' +
+      '.bar{position:sticky;top:0;display:flex;gap:8px;padding:12px 16px;background:#001f3f;box-shadow:0 2px 8px rgba(0,0,0,0.15)}' +
+      '.bar button{flex:1;padding:12px;font-size:15px;font-weight:700;border:none;border-radius:8px;cursor:pointer}' +
+      '.back{background:rgba(255,255,255,0.15);color:#fff}' +
+      '.print{background:#d4a55a;color:#001f3f}' +
+      '@media print{.bar{display:none}}</style></head><body>' +
+      '<div class="bar">' +
+      '<button class="back" onclick="window.close()">← 돌아가기</button>' +
+      '<button class="print" onclick="window.print()">🖨 인쇄하기</button>' +
+      '</div>' +
+      '<div class="content">' +
       '<h1>🏠 가정예배</h1>' +
       '<p class="meta">' + r.date + (r.ref ? ' · 본문: ' + r.ref : '') + '</p>' +
-      body + '</body></html>')
+      body + '</div></body></html>')
     w.document.close()
     w.focus()
-    setTimeout(() => w.print(), 300)
   }
 
   return (
