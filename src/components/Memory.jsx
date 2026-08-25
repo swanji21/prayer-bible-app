@@ -3,26 +3,32 @@ import { db } from '../firebase'
 import { collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc, setDoc } from 'firebase/firestore'
 import s from './Prayer.module.css'
 
-const DEFAULT_CATS = ['구원', '믿음', '사랑', '위로', '지혜', '감사', '기타']
+const DEFAULT_TOPICS = ['구원', '믿음', '사랑', '위로', '지혜', '감사', '기타']
+
+const OT = ['창세기','출애굽기','레위기','민수기','신명기','여호수아','사사기','룻기','사무엘상','사무엘하','열왕기상','열왕기하','역대상','역대하','에스라','느헤미야','에스더','욥기','시편','잠언','전도서','아가','이사야','예레미야','예레미야애가','에스겔','다니엘','호세아','요엘','아모스','오바댜','요나','미가','나훔','하박국','스바냐','학개','스가랴','말라기']
+const NT = ['마태복음','마가복음','누가복음','요한복음','사도행전','로마서','고린도전서','고린도후서','갈라디아서','에베소서','빌립보서','골로새서','데살로니가전서','데살로니가후서','디모데전서','디모데후서','디도서','빌레몬서','히브리서','야고보서','베드로전서','베드로후서','요한일서','요한이서','요한삼서','유다서','요한계시록']
+const ALL_BOOKS = [...OT, ...NT]
 
 export default function Memory() {
   const [verses, setVerses] = useState([])
-  const [cats, setCats] = useState(DEFAULT_CATS)
+  const [topics, setTopics] = useState(DEFAULT_TOPICS)
+  const [viewMode, setViewMode] = useState('topic')
   const [activeCat, setActiveCat] = useState('전체')
+  const [bookTab, setBookTab] = useState('구약')
   const [expandedId, setExpandedId] = useState(null)
 
   const [showModal, setShowModal] = useState(false)
-  const [newRef, setNewRef] = useState('')
   const [newText, setNewText] = useState('')
-  const [newCat, setNewCat] = useState('구원')
+  const [newTopic, setNewTopic] = useState('구원')
+  const [newBook, setNewBook] = useState('')
 
   const [editingId, setEditingId] = useState(null)
-  const [editRef, setEditRef] = useState('')
   const [editText, setEditText] = useState('')
-  const [editCat, setEditCat] = useState('')
+  const [editTopic, setEditTopic] = useState('')
+  const [editBook, setEditBook] = useState('')
 
   const [showCatMgr, setShowCatMgr] = useState(false)
-  const [newCatName, setNewCatName] = useState('')
+  const [newTopicName, setNewTopicName] = useState('')
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'memory'), snap => {
@@ -34,46 +40,48 @@ export default function Memory() {
   useEffect(() => {
     const unsub = onSnapshot(doc(db, 'settings', 'memoryCats'), d => {
       if (d.exists() && Array.isArray(d.data().list) && d.data().list.length > 0) {
-        setCats(d.data().list)
+        setTopics(d.data().list)
       }
     })
     return unsub
   }, [])
 
-  const saveCats = async (list) => {
-    setCats(list)
+  useEffect(() => { setActiveCat('전체') }, [viewMode])
+
+  const saveTopics = async (list) => {
+    setTopics(list)
     await setDoc(doc(db, 'settings', 'memoryCats'), { list })
   }
 
-  const addCat = async () => {
-    const name = newCatName.trim()
-    if (!name || cats.includes(name)) { setNewCatName(''); return }
-    await saveCats([...cats, name])
-    setNewCatName('')
+  const addTopic = async () => {
+    const name = newTopicName.trim()
+    if (!name || topics.includes(name)) { setNewTopicName(''); return }
+    await saveTopics([...topics, name])
+    setNewTopicName('')
   }
 
-  const removeCat = async (name) => {
-    if (!confirm('"' + name + '" 카테고리를 삭제할까요?\n(이 카테고리의 암송 구절은 "기타"로 이동해요)')) return
-    const affected = verses.filter(v => v.cat === name)
-    await Promise.all(affected.map(v => updateDoc(doc(db, 'memory', v.id), { cat: '기타' })))
-    const next = cats.filter(c => c !== name)
-    await saveCats(next.includes('기타') ? next : [...next, '기타'])
+  const removeTopic = async (name) => {
+    if (!confirm('"' + name + '" 주제를 삭제할까요?\n(이 주제의 암송 구절은 "기타"로 이동해요)')) return
+    const affected = verses.filter(v => v.topic === name)
+    await Promise.all(affected.map(v => updateDoc(doc(db, 'memory', v.id), { topic: '기타' })))
+    const next = topics.filter(c => c !== name)
+    await saveTopics(next.includes('기타') ? next : [...next, '기타'])
     if (activeCat === name) setActiveCat('전체')
   }
 
-  const moveCat = async (idx, dir) => {
-    const next = [...cats]
+  const moveTopic = async (idx, dir) => {
+    const next = [...topics]
     const target = idx + dir
     if (target < 0 || target >= next.length) return
     ;[next[idx], next[target]] = [next[target], next[idx]]
-    await saveCats(next)
+    await saveTopics(next)
   }
 
   const addVerse = async () => {
-    if (!newRef.trim() && !newText.trim()) return
-    const cat = cats.includes(newCat) ? newCat : (cats[0] || '기타')
-    await addDoc(collection(db, 'memory'), { ref: newRef.trim(), text: newText.trim(), cat })
-    setNewRef(''); setNewText(''); setNewCat(cats[0] || '구원'); setShowModal(false)
+    if (!newText.trim()) return
+    const topic = topics.includes(newTopic) ? newTopic : (topics[0] || '기타')
+    await addDoc(collection(db, 'memory'), { text: newText.trim(), topic, book: newBook })
+    setNewText(''); setNewTopic(topics[0] || '구원'); setNewBook(''); setShowModal(false)
   }
 
   const deleteVerse = async (id) => {
@@ -82,16 +90,17 @@ export default function Memory() {
   }
 
   const startEdit = (v) => {
-    setEditingId(v.id); setEditRef(v.ref || ''); setEditText(v.text || ''); setEditCat(v.cat || (cats[0] || '기타'))
+    setEditingId(v.id); setEditText(v.text || ''); setEditTopic(v.topic || (topics[0] || '기타')); setEditBook(v.book || '')
   }
 
   const saveEdit = async () => {
-    await updateDoc(doc(db, 'memory', editingId), { ref: editRef.trim(), text: editText.trim(), cat: editCat })
+    await updateDoc(doc(db, 'memory', editingId), { text: editText.trim(), topic: editTopic, book: editBook })
     setEditingId(null)
   }
 
   const shareVerse = async (v) => {
-    const text = '📖 ' + (v.ref || '') + '\n' + (v.text || '')
+    const tag = [v.book, v.topic].filter(Boolean).join(' · ')
+    const text = (tag ? '📖 ' + tag + '\n' : '') + (v.text || '')
     try {
       if (navigator.share) await navigator.share({ title: '말씀 암송', text })
       else { await navigator.clipboard.writeText(text); alert('클립보드에 복사되었습니다') }
@@ -102,12 +111,12 @@ export default function Memory() {
     const w = window.open('', '_blank')
     if (!w) { alert('팝업이 차단되어 있어요. 팝업을 허용해주세요.'); return }
     const safe = (v.text || '').replace(/</g, '&lt;').replace(/\n/g, '<br>')
+    const tag = [v.book, v.topic].filter(Boolean).join(' · ')
     w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>말씀 암송</title>' +
       '<style>body{font-family:-apple-system,"Apple SD Gothic Neo",sans-serif;padding:0;color:#222;margin:0}' +
-      '.content{padding:32px;max-width:700px;margin:0 auto;text-align:center}' +
-      '.ref{font-size:16px;color:#001f3f;font-weight:700;margin-bottom:16px}' +
-      '.txt{font-size:20px;line-height:1.9;color:#333}' +
-      '.cat{margin-top:22px;font-size:13px;color:#999}' +
+      '.content{padding:40px 32px;max-width:700px;margin:0 auto;text-align:center}' +
+      '.txt{font-size:22px;line-height:2;color:#333}' +
+      '.tag{margin-top:26px;font-size:14px;color:#001f3f;font-weight:700}' +
       '.bar{position:sticky;top:0;display:flex;gap:8px;padding:12px 16px;background:#001f3f;box-shadow:0 2px 8px rgba(0,0,0,0.15)}' +
       '.bar button{flex:1;padding:12px;font-size:15px;font-weight:700;border:none;border-radius:8px;cursor:pointer}' +
       '.back{background:rgba(255,255,255,0.15);color:#fff}' +
@@ -118,31 +127,61 @@ export default function Memory() {
       '<button class="print" onclick="window.print()">🖨 인쇄하기</button>' +
       '</div>' +
       '<div class="content">' +
-      '<div class="ref">' + (v.ref || '') + '</div>' +
       '<div class="txt">' + safe + '</div>' +
-      (v.cat ? '<div class="cat">[' + v.cat + ']</div>' : '') +
+      (tag ? '<div class="tag">' + tag + '</div>' : '') +
       '</div></body></html>')
     w.document.close()
     w.focus()
   }
 
-  const filtered = activeCat === '전체' ? verses : verses.filter(v => v.cat === activeCat)
+  const sectionBooks = (bookTab === '구약' ? OT : NT).filter(b => verses.some(v => v.book === b))
+
+  let filtered
+  if (viewMode === 'topic') {
+    filtered = activeCat === '전체' ? verses : verses.filter(v => v.topic === activeCat)
+  } else {
+    filtered = activeCat === '전체'
+      ? verses.filter(v => (bookTab === '구약' ? OT : NT).includes(v.book))
+      : verses.filter(v => v.book === activeCat)
+  }
 
   return (
     <div className={s.wrap}>
+      <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
+        <button onClick={() => setViewMode('topic')} style={toggleStyle(viewMode === 'topic')}>주제별</button>
+        <button onClick={() => setViewMode('book')} style={toggleStyle(viewMode === 'book')}>성경별</button>
+      </div>
+
+      {viewMode === 'book' && (
+        <div style={{ display: 'flex', gap: '6px', marginBottom: '10px' }}>
+          {['구약', '신약'].map(sec => (
+            <button key={sec} onClick={() => { setBookTab(sec); setActiveCat('전체') }} style={subToggleStyle(bookTab === sec)}>{sec}</button>
+          ))}
+        </div>
+      )}
+
       <div className={s.catTabs}>
-        <button className={s.catTab + (activeCat === '전체' ? ' ' + s.catActive : '')} onClick={() => setActiveCat('전체')}>
-          전체{verses.length > 0 && <span className={s.catBadge}>{verses.length}</span>}
-        </button>
-        {cats.map(c => {
-          const cnt = verses.filter(v => v.cat === c).length
-          return (
-            <button key={c} className={s.catTab + (activeCat === c ? ' ' + s.catActive : '')} onClick={() => setActiveCat(c)}>
-              {c}{cnt > 0 && <span className={s.catBadge}>{cnt}</span>}
-            </button>
-          )
-        })}
-        <button className={s.catTab} onClick={() => setShowCatMgr(true)} style={{ opacity: 0.7 }}>⚙ 편집</button>
+        <button className={s.catTab + (activeCat === '전체' ? ' ' + s.catActive : '')} onClick={() => setActiveCat('전체')}>전체</button>
+        {viewMode === 'topic'
+          ? topics.map(c => {
+              const cnt = verses.filter(v => v.topic === c).length
+              return (
+                <button key={c} className={s.catTab + (activeCat === c ? ' ' + s.catActive : '')} onClick={() => setActiveCat(c)}>
+                  {c}{cnt > 0 && <span className={s.catBadge}>{cnt}</span>}
+                </button>
+              )
+            })
+          : sectionBooks.map(c => {
+              const cnt = verses.filter(v => v.book === c).length
+              return (
+                <button key={c} className={s.catTab + (activeCat === c ? ' ' + s.catActive : '')} onClick={() => setActiveCat(c)}>
+                  {c}<span className={s.catBadge}>{cnt}</span>
+                </button>
+              )
+            })}
+        {viewMode === 'topic' && (
+          <button className={s.catTab} onClick={() => setShowCatMgr(true)} style={{ opacity: 0.7 }}>⚙ 편집</button>
+        )}
       </div>
 
       <div className={s.list}>
@@ -152,13 +191,19 @@ export default function Memory() {
           if (editingId === v.id) {
             return (
               <div key={v.id} style={{ background: 'var(--bg2)', border: '0.5px solid var(--border)', borderRadius: 'var(--radius)', padding: '12px' }}>
-                <input className={s.sheetInput} value={editRef} onChange={e => setEditRef(e.target.value)} placeholder="성경구절 (예: 요 3:16)" />
                 <textarea className={s.sheetInput} value={editText} onChange={e => setEditText(e.target.value)} placeholder="본문 내용" rows={3} style={{ resize: 'vertical' }} />
+                <div style={{ fontSize: '12px', color: 'var(--text2)', margin: '4px 0 6px' }}>주제</div>
                 <div className={s.catRow}>
-                  {cats.map(c => (
-                    <button key={c} className={s.catBtn + (editCat === c ? ' ' + s.catSel : '')} onClick={() => setEditCat(c)}>{c}</button>
+                  {topics.map(c => (
+                    <button key={c} className={s.catBtn + (editTopic === c ? ' ' + s.catSel : '')} onClick={() => setEditTopic(c)}>{c}</button>
                   ))}
                 </div>
+                <div style={{ fontSize: '12px', color: 'var(--text2)', margin: '4px 0 6px' }}>성경 (선택)</div>
+                <select className={s.sheetInput} value={editBook} onChange={e => setEditBook(e.target.value)}>
+                  <option value="">선택 안 함</option>
+                  <optgroup label="구약">{OT.map(b => <option key={b} value={b}>{b}</option>)}</optgroup>
+                  <optgroup label="신약">{NT.map(b => <option key={b} value={b}>{b}</option>)}</optgroup>
+                </select>
                 <div className={s.sheetBtns}>
                   <button className={s.cancelBtn} onClick={() => setEditingId(null)}>취소</button>
                   <button className={s.confirmBtn} onClick={saveEdit}>저장</button>
@@ -168,17 +213,18 @@ export default function Memory() {
           }
           return (
             <div key={v.id} style={{ background: 'var(--bg2)', border: '0.5px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
-              <div onClick={() => setExpandedId(isOpen ? null : v.id)} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '11px 12px', cursor: 'pointer' }}>
+              <div onClick={() => setExpandedId(isOpen ? null : v.id)} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '11px 12px', cursor: 'pointer' }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text)' }}>{v.ref || '(구절 없음)'}</div>
-                  {!isOpen && v.text && <div style={{ fontSize: '12px', color: 'var(--text2)', marginTop: '3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.text}</div>}
+                  <div style={{ fontSize: '14px', color: 'var(--text)', lineHeight: 1.5, ...(isOpen ? {} : { overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }) }}>{v.text}</div>
                 </div>
-                {v.cat && <span className={s.cat}>{v.cat}</span>}
-                <span style={{ color: 'var(--text2)', fontSize: '12px' }}>{isOpen ? '▲' : '▼'}</span>
+                <div style={{ display: 'flex', gap: '4px', flexShrink: 0, alignItems: 'center' }}>
+                  {v.book && <span className={s.cat}>{v.book}</span>}
+                  {v.topic && <span className={s.cat}>{v.topic}</span>}
+                  <span style={{ color: 'var(--text2)', fontSize: '12px' }}>{isOpen ? '▲' : '▼'}</span>
+                </div>
               </div>
               {isOpen && (
                 <div style={{ padding: '0 12px 12px' }}>
-                  {v.text && <p style={{ fontSize: '14px', lineHeight: 1.7, color: 'var(--text)', whiteSpace: 'pre-wrap', margin: '0 0 10px' }}>{v.text}</p>}
                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                     <button className={s.catBtn} onClick={() => shareVerse(v)}>📤 공유</button>
                     <button className={s.catBtn} onClick={() => printVerse(v)}>🖨 프린트</button>
@@ -192,19 +238,29 @@ export default function Memory() {
         })}
       </div>
 
-      <button className={s.addBtn} onClick={() => { setNewCat(activeCat !== '전체' ? activeCat : (cats[0] || '구원')); setShowModal(true) }}>+ 암송 구절 추가</button>
+      <button className={s.addBtn} onClick={() => {
+        setNewTopic(viewMode === 'topic' && activeCat !== '전체' ? activeCat : (topics[0] || '구원'))
+        setNewBook(viewMode === 'book' && activeCat !== '전체' ? activeCat : '')
+        setShowModal(true)
+      }}>+ 암송 구절 추가</button>
 
       {showModal && (
         <div className={s.overlay} onClick={() => setShowModal(false)}>
           <div className={s.sheet} onClick={e => e.stopPropagation()}>
             <div className={s.sheetTitle}>암송 구절 추가</div>
-            <input className={s.sheetInput} value={newRef} onChange={e => setNewRef(e.target.value)} placeholder="성경구절 (예: 요 3:16)" />
-            <textarea className={s.sheetInput} value={newText} onChange={e => setNewText(e.target.value)} placeholder="본문 내용" rows={3} style={{ resize: 'vertical' }} />
+            <textarea className={s.sheetInput} value={newText} onChange={e => setNewText(e.target.value)} placeholder="본문 내용" rows={3} style={{ resize: 'vertical' }} autoFocus />
+            <div style={{ fontSize: '12px', color: 'var(--text2)', margin: '2px 0 6px' }}>주제</div>
             <div className={s.catRow}>
-              {cats.map(c => (
-                <button key={c} className={s.catBtn + (newCat === c ? ' ' + s.catSel : '')} onClick={() => setNewCat(c)}>{c}</button>
+              {topics.map(c => (
+                <button key={c} className={s.catBtn + (newTopic === c ? ' ' + s.catSel : '')} onClick={() => setNewTopic(c)}>{c}</button>
               ))}
             </div>
+            <div style={{ fontSize: '12px', color: 'var(--text2)', margin: '2px 0 6px' }}>성경 (선택)</div>
+            <select className={s.sheetInput} value={newBook} onChange={e => setNewBook(e.target.value)}>
+              <option value="">선택 안 함</option>
+              <optgroup label="구약">{OT.map(b => <option key={b} value={b}>{b}</option>)}</optgroup>
+              <optgroup label="신약">{NT.map(b => <option key={b} value={b}>{b}</option>)}</optgroup>
+            </select>
             <div className={s.sheetBtns}>
               <button className={s.cancelBtn} onClick={() => setShowModal(false)}>취소</button>
               <button className={s.confirmBtn} onClick={addVerse}>추가</button>
@@ -216,22 +272,22 @@ export default function Memory() {
       {showCatMgr && (
         <div className={s.overlay} onClick={() => setShowCatMgr(false)}>
           <div className={s.sheet} onClick={e => e.stopPropagation()}>
-            <div className={s.sheetTitle}>카테고리 관리</div>
+            <div className={s.sheetTitle}>주제 관리</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', margin: '4px 0 12px', maxHeight: '260px', overflowY: 'auto' }}>
-              {cats.map((c, idx) => (
+              {topics.map((c, idx) => (
                 <div key={c} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 10px', background: 'var(--bg2)', borderRadius: '8px' }}>
                   <span style={{ flex: 1, fontSize: '14px', color: 'var(--text)' }}>{c}</span>
-                  <span style={{ fontSize: '12px', color: 'var(--text2)', marginRight: '4px' }}>{verses.filter(v => v.cat === c).length}개</span>
-                  <button onClick={() => moveCat(idx, -1)} disabled={idx === 0} style={{ padding: '4px 8px', border: '1px solid var(--border)', borderRadius: '6px', background: 'transparent', cursor: idx === 0 ? 'default' : 'pointer', opacity: idx === 0 ? 0.3 : 1, color: 'var(--text)' }}>▲</button>
-                  <button onClick={() => moveCat(idx, 1)} disabled={idx === cats.length - 1} style={{ padding: '4px 8px', border: '1px solid var(--border)', borderRadius: '6px', background: 'transparent', cursor: idx === cats.length - 1 ? 'default' : 'pointer', opacity: idx === cats.length - 1 ? 0.3 : 1, color: 'var(--text)' }}>▼</button>
-                  <button onClick={() => removeCat(c)} style={{ padding: '4px 9px', border: 'none', borderRadius: '6px', background: '#e57373', color: 'white', cursor: 'pointer' }}>x</button>
+                  <span style={{ fontSize: '12px', color: 'var(--text2)', marginRight: '4px' }}>{verses.filter(v => v.topic === c).length}개</span>
+                  <button onClick={() => moveTopic(idx, -1)} disabled={idx === 0} style={{ padding: '4px 8px', border: '1px solid var(--border)', borderRadius: '6px', background: 'transparent', cursor: idx === 0 ? 'default' : 'pointer', opacity: idx === 0 ? 0.3 : 1, color: 'var(--text)' }}>▲</button>
+                  <button onClick={() => moveTopic(idx, 1)} disabled={idx === topics.length - 1} style={{ padding: '4px 8px', border: '1px solid var(--border)', borderRadius: '6px', background: 'transparent', cursor: idx === topics.length - 1 ? 'default' : 'pointer', opacity: idx === topics.length - 1 ? 0.3 : 1, color: 'var(--text)' }}>▼</button>
+                  <button onClick={() => removeTopic(c)} style={{ padding: '4px 9px', border: 'none', borderRadius: '6px', background: '#e57373', color: 'white', cursor: 'pointer' }}>x</button>
                 </div>
               ))}
             </div>
             <div style={{ display: 'flex', gap: '6px' }}>
-              <input className={s.sheetInput} style={{ flex: 1, margin: 0 }} value={newCatName} onChange={e => setNewCatName(e.target.value)}
-                placeholder="새 카테고리 이름" onKeyDown={e => e.key === 'Enter' && addCat()} />
-              <button className={s.confirmBtn} style={{ flex: 'none', padding: '0 18px' }} onClick={addCat}>추가</button>
+              <input className={s.sheetInput} style={{ flex: 1, margin: 0 }} value={newTopicName} onChange={e => setNewTopicName(e.target.value)}
+                placeholder="새 주제 이름" onKeyDown={e => e.key === 'Enter' && addTopic()} />
+              <button className={s.confirmBtn} style={{ flex: 'none', padding: '0 18px' }} onClick={addTopic}>추가</button>
             </div>
             <div className={s.sheetBtns} style={{ marginTop: '12px' }}>
               <button className={s.confirmBtn} onClick={() => setShowCatMgr(false)}>완료</button>
@@ -242,3 +298,17 @@ export default function Memory() {
     </div>
   )
 }
+
+const toggleStyle = (active) => ({
+  flex: 1, padding: '9px', borderRadius: '10px', fontSize: '14px', fontWeight: '700',
+  border: 'none', cursor: 'pointer',
+  background: active ? 'var(--navy)' : 'var(--bg2)',
+  color: active ? 'var(--gold-mid)' : 'var(--text2)'
+})
+
+const subToggleStyle = (active) => ({
+  flex: 1, padding: '7px', borderRadius: '8px', fontSize: '13px', fontWeight: '600',
+  border: '0.5px solid var(--border)', cursor: 'pointer',
+  background: active ? 'var(--gold-light)' : 'transparent',
+  color: active ? '#5a3e12' : 'var(--text2)'
+})
