@@ -9,6 +9,19 @@ const OT = ['창세기','출애굽기','레위기','민수기','신명기','여�
 const NT = ['마태복음','마가복음','누가복음','요한복음','사도행전','로마서','고린도전서','고린도후서','갈라디아서','에베소서','빌립보서','골로새서','데살로니가전서','데살로니가후서','디모데전서','디모데후서','디도서','빌레몬서','히브리서','야고보서','베드로전서','베드로후서','요한일서','요한이서','요한삼서','유다서','요한계시록']
 const ALL_BOOKS = [...OT, ...NT]
 
+// 본문에서 맨 앞 성경구절 표시(예: "누가복음 10:20")를 분리
+function parseVerseStatic(raw) {
+  const t = (raw || '').trim()
+  if (!t) return { ref: '', body: '' }
+  const nl = t.indexOf('\n')
+  if (nl > 0 && nl < 40) {
+    return { ref: t.slice(0, nl).trim(), body: t.slice(nl + 1).trim() }
+  }
+  const m = t.match(/^([가-힣]{1,7}(?:\s?[상하전후일이삼]?)?\s*\d+\s*:\s*\d+(?:\s*[-~]\s*\d+)?)\s+(.*)$/s)
+  if (m) return { ref: m[1].replace(/\s+/g, ' ').trim(), body: m[2].trim() }
+  return { ref: '', body: t }
+}
+
 export default function Memory() {
   const [verses, setVerses] = useState([])
   const [topics, setTopics] = useState(DEFAULT_TOPICS)
@@ -99,8 +112,10 @@ export default function Memory() {
   }
 
   const shareVerse = async (v) => {
+    const parsed = parseVerseStatic(v.text)
     const tag = [v.book, v.topic].filter(Boolean).join(' · ')
-    const text = (tag ? '📖 ' + tag + '\n' : '') + (v.text || '')
+    const header = [parsed.ref, tag].filter(Boolean).join('  ·  ')
+    const text = (header ? '📖 ' + header + '\n' : '') + parsed.body
     try {
       if (navigator.share) await navigator.share({ title: '말씀 암송', text })
       else { await navigator.clipboard.writeText(text); alert('클립보드에 복사되었습니다') }
@@ -110,11 +125,14 @@ export default function Memory() {
   const printVerse = (v) => {
     const w = window.open('', '_blank')
     if (!w) { alert('팝업이 차단되어 있어요. 팝업을 허용해주세요.'); return }
-    const safe = (v.text || '').replace(/</g, '&lt;').replace(/\n/g, '<br>')
+    const parsed = parseVerseStatic(v.text)
+    const safe = parsed.body.replace(/</g, '&lt;').replace(/\n/g, '<br>')
+    const refLine = parsed.ref
     const tag = [v.book, v.topic].filter(Boolean).join(' · ')
     w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>말씀 암송</title>' +
       '<style>body{font-family:-apple-system,"Apple SD Gothic Neo",sans-serif;padding:0;color:#222;margin:0}' +
       '.content{padding:40px 32px;max-width:700px;margin:0 auto;text-align:center}' +
+      '.ref{font-size:16px;font-weight:700;color:#b8863b;margin-bottom:16px}' +
       '.txt{font-size:22px;line-height:2;color:#333}' +
       '.tag{margin-top:26px;font-size:14px;color:#001f3f;font-weight:700}' +
       '.bar{position:sticky;top:0;display:flex;gap:8px;padding:12px 16px;background:#001f3f;box-shadow:0 2px 8px rgba(0,0,0,0.15)}' +
@@ -127,6 +145,7 @@ export default function Memory() {
       '<button class="print" onclick="window.print()">🖨 인쇄하기</button>' +
       '</div>' +
       '<div class="content">' +
+      (refLine ? '<div class="ref">' + refLine + '</div>' : '') +
       '<div class="txt">' + safe + '</div>' +
       (tag ? '<div class="tag">' + tag + '</div>' : '') +
       '</div></body></html>')
@@ -135,6 +154,8 @@ export default function Memory() {
   }
 
   const sectionBooks = (bookTab === '구약' ? OT : NT).filter(b => verses.some(v => v.book === b))
+
+  const parseVerse = parseVerseStatic
 
   let filtered
   if (viewMode === 'topic') {
@@ -215,7 +236,15 @@ export default function Memory() {
             <div key={v.id} style={{ background: 'var(--bg2)', border: '0.5px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
               <div onClick={() => setExpandedId(isOpen ? null : v.id)} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '11px 12px', cursor: 'pointer' }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: '14px', color: 'var(--text)', lineHeight: 1.5, ...(isOpen ? {} : { overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }) }}>{v.text}</div>
+                  {(() => {
+                    const { ref, body } = parseVerse(v.text)
+                    return (
+                      <>
+                        {ref && <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--gold-mid, #b8863b)', marginBottom: '3px' }}>{ref}</div>}
+                        <div style={{ fontSize: '14px', color: 'var(--text)', lineHeight: 1.6, whiteSpace: 'pre-wrap', ...(isOpen ? {} : { overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }) }}>{body}</div>
+                      </>
+                    )
+                  })()}
                 </div>
                 <div style={{ display: 'flex', gap: '4px', flexShrink: 0, alignItems: 'center' }}>
                   {v.book && <span className={s.cat}>{v.book}</span>}
