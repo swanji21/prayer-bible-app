@@ -8,18 +8,38 @@ const DEFAULT_TOPICS = ['구원', '믿음', '사랑', '위로', '지혜', '감�
 const OT = ['창세기','출애굽기','레위기','민수기','신명기','여호수아','사사기','룻기','사무엘상','사무엘하','열왕기상','열왕기하','역대상','역대하','에스라','느헤미야','에스더','욥기','시편','잠언','전도서','아가','이사야','예레미야','예레미야애가','에스겔','다니엘','호세아','요엘','아모스','오바댜','요나','미가','나훔','하박국','스바냐','학개','스가랴','말라기']
 const NT = ['마태복음','마가복음','누가복음','요한복음','사도행전','로마서','고린도전서','고린도후서','갈라디아서','에베소서','빌립보서','골로새서','데살로니가전서','데살로니가후서','디모데전서','디모데후서','디도서','빌레몬서','히브리서','야고보서','베드로전서','베드로후서','요한일서','요한이서','요한삼서','유다서','요한계시록']
 const ALL_BOOKS = [...OT, ...NT]
+const BOOK_ORDER = Object.fromEntries(ALL_BOOKS.map((b, i) => [b, i]))
 
-// 본문에서 맨 앞 성경구절 표시(예: "누가복음 10:20")를 분리
+// 본문에서 맨 앞 성경구절 표시(예: "누가복음 10:20")를 분리 + 책/장/절 추출
 function parseVerseStatic(raw) {
   const t = (raw || '').trim()
-  if (!t) return { ref: '', body: '' }
+  if (!t) return { ref: '', body: '', book: '', chap: 9999, verse: 9999 }
+  let ref = '', body = t
   const nl = t.indexOf('\n')
   if (nl > 0 && nl < 40) {
-    return { ref: t.slice(0, nl).trim(), body: t.slice(nl + 1).trim() }
+    ref = t.slice(0, nl).trim(); body = t.slice(nl + 1).trim()
+  } else {
+    const m = t.match(/^([가-힣]{1,7}(?:\s?[상하전후일이삼]?)?\s*\d+\s*:\s*\d+(?:\s*[-~]\s*\d+)?)\s+(.*)$/s)
+    if (m) { ref = m[1].replace(/\s+/g, ' ').trim(); body = m[2].trim() }
   }
-  const m = t.match(/^([가-힣]{1,7}(?:\s?[상하전후일이삼]?)?\s*\d+\s*:\s*\d+(?:\s*[-~]\s*\d+)?)\s+(.*)$/s)
-  if (m) return { ref: m[1].replace(/\s+/g, ' ').trim(), body: m[2].trim() }
-  return { ref: '', body: t }
+  // ref에서 책이름 / 장 / 절 뽑기
+  let book = '', chap = 9999, verse = 9999
+  if (ref) {
+    const rm = ref.match(/^([가-힣]+)\s*(\d+)\s*:\s*(\d+)/)
+    if (rm) { book = rm[1]; chap = parseInt(rm[2], 10); verse = parseInt(rm[3], 10) }
+  }
+  return { ref, body, book, chap, verse }
+}
+
+// 성경 순서 → 장 → 절 순 정렬 비교 (v.book 태그 우선, 없으면 본문에서 추출한 책)
+function verseSort(a, b) {
+  const pa = parseVerseStatic(a.text), pb = parseVerseStatic(b.text)
+  const bookA = a.book || pa.book, bookB = b.book || pb.book
+  const oa = bookA in BOOK_ORDER ? BOOK_ORDER[bookA] : 9999
+  const ob = bookB in BOOK_ORDER ? BOOK_ORDER[bookB] : 9999
+  if (oa !== ob) return oa - ob
+  if (pa.chap !== pb.chap) return pa.chap - pb.chap
+  return pa.verse - pb.verse
 }
 
 export default function Memory() {
@@ -165,6 +185,7 @@ export default function Memory() {
       ? verses.filter(v => (bookTab === '구약' ? OT : NT).includes(v.book))
       : verses.filter(v => v.book === activeCat)
   }
+  filtered = [...filtered].sort(verseSort)
 
   return (
     <div className={s.wrap}>
@@ -204,6 +225,12 @@ export default function Memory() {
           <button className={s.catTab} onClick={() => setShowCatMgr(true)} style={{ opacity: 0.7 }}>⚙ 편집</button>
         )}
       </div>
+
+      <button className={s.addBtn} style={{ margin: '4px 0 10px' }} onClick={() => {
+        setNewTopic(viewMode === 'topic' && activeCat !== '전체' ? activeCat : (topics[0] || '구원'))
+        setNewBook(viewMode === 'book' && activeCat !== '전체' ? activeCat : '')
+        setShowModal(true)
+      }}>+ 암송 구절 추가</button>
 
       <div className={s.list}>
         {filtered.length === 0 && <div className={s.empty}>암송 구절이 없어요</div>}
@@ -266,12 +293,6 @@ export default function Memory() {
           )
         })}
       </div>
-
-      <button className={s.addBtn} onClick={() => {
-        setNewTopic(viewMode === 'topic' && activeCat !== '전체' ? activeCat : (topics[0] || '구원'))
-        setNewBook(viewMode === 'book' && activeCat !== '전체' ? activeCat : '')
-        setShowModal(true)
-      }}>+ 암송 구절 추가</button>
 
       {showModal && (
         <div className={s.overlay} onClick={() => setShowModal(false)}>
