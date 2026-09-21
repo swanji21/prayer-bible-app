@@ -24,6 +24,7 @@ export default function Prayer() {
   const [newCat, setNewCat] = useState('가족')
   const [showCatMgr, setShowCatMgr] = useState(false)
   const [newCatName, setNewCatName] = useState('')
+  const [answeredOpen, setAnsweredOpen] = useState(false)
   const [totalSaved, setTotalSaved] = useState(0)
   const [elapsed, setElapsed] = useState(0)
   const [isRunning, setIsRunning] = useState(false)
@@ -178,6 +179,12 @@ export default function Prayer() {
     await updateDoc(doc(db, 'prayers', id), { done: !done })
   }
 
+  // 기도 응답됨 표시 / 되돌리기
+  const markAnswered = async (id, val, e) => {
+    if (e) e.stopPropagation()
+    await updateDoc(doc(db, 'prayers', id), { answered: val, answeredAt: val ? Date.now() : null })
+  }
+
   const deletePrayer = async (id, e) => {
     e.stopPropagation()
     await deleteDoc(doc(db, 'prayers', id))
@@ -192,9 +199,12 @@ export default function Prayer() {
 
   const verse = VERSES[new Date().getDate() % VERSES.length]
   const filtered = activeCat === '전체' ? prayers : prayers.filter(p => p.cat === activeCat)
-  const doneCount = prayers.filter(p => p.done).length
-  const filteredDone = filtered.filter(p => p.done).length
-  const progPct = filtered.length ? (filteredDone / filtered.length) * 100 : 0
+  const activeList = filtered.filter(p => !p.answered)
+  const answeredList = filtered.filter(p => p.answered).sort((a, b) => (b.answeredAt || 0) - (a.answeredAt || 0))
+  const totalActive = prayers.filter(p => !p.answered).length
+  const doneCount = prayers.filter(p => p.done && !p.answered).length
+  const filteredDone = activeList.filter(p => p.done).length
+  const progPct = activeList.length ? (filteredDone / activeList.length) * 100 : 0
 
   return (
     <div className={s.wrap}>
@@ -220,27 +230,51 @@ export default function Prayer() {
 
       <div className={s.progressRow}>
         <span className={s.progressText}>
-          {activeCat === '전체' ? '전체 ' + doneCount + '/' + prayers.length : activeCat + ' ' + filteredDone + '/' + filtered.length} 완료
+          {activeCat === '전체' ? '전체 ' + doneCount + '/' + totalActive : activeCat + ' ' + filteredDone + '/' + activeList.length} 완료
         </span>
         <div className={s.progressBar}>
           <div className={s.progressFill} style={{ width: progPct + '%' }} />
         </div>
       </div>
 
+      <button className={s.addBtn} style={{ margin: '0 0 12px' }} onClick={() => { setNewCat(activeCat !== '전체' ? activeCat : (cats[0] || '가족')); setShowModal(true) }}>+ 기도 제목 추가</button>
+
       <div className={s.list}>
-        {filtered.length === 0 && <div className={s.empty}>이 카테고리에 기도 제목이 없어요</div>}
-        {filtered.map(p => (
+        {activeList.length === 0 && <div className={s.empty}>이 카테고리에 기도 제목이 없어요</div>}
+        {activeList.map(p => (
           <div key={p.id} className={s.item + (p.done ? ' ' + s.done : '')} onClick={() => togglePrayer(p.id, p.done)}>
             <div className={s.circle}>
               {p.done && <svg width="12" height="12" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" stroke="white" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>}
             </div>
             <span className={s.itemText}>{p.text}</span>
             <span className={s.cat}>{p.cat}</span>
+            <button className={s.del} title="기도 응답됨으로 표시" onClick={(e) => markAnswered(p.id, true, e)} style={{ color: 'var(--gold-mid, #b8863b)' }}>🙏</button>
             <button className={s.del} onClick={(e) => deletePrayer(p.id, e)}>x</button>
           </div>
         ))}
       </div>
-      <button className={s.addBtn} onClick={() => { setNewCat(activeCat !== '전체' ? activeCat : (cats[0] || '가족')); setShowModal(true) }}>+ 기도 제목 추가</button>
+
+      {answeredList.length > 0 && (
+        <div style={{ marginTop: '18px' }}>
+          <button onClick={() => setAnsweredOpen(o => !o)} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: 'var(--bg2)', border: '0.5px solid var(--border)', borderRadius: 'var(--radius, 10px)', cursor: 'pointer', color: 'var(--text)', fontSize: '14px', fontWeight: 700 }}>
+            <span>🙏 응답된 기도 <span className={s.catBadge}>{answeredList.length}</span></span>
+            <span style={{ color: 'var(--text2)', fontSize: '12px' }}>{answeredOpen ? '▲' : '▼'}</span>
+          </button>
+          {answeredOpen && (
+            <div className={s.list} style={{ marginTop: '8px' }}>
+              {answeredList.map(p => (
+                <div key={p.id} className={s.item} style={{ opacity: 0.9 }}>
+                  <span style={{ color: 'var(--gold-mid, #b8863b)', fontSize: '15px', flexShrink: 0 }}>🙏</span>
+                  <span className={s.itemText}>{p.text}</span>
+                  <span className={s.cat}>{p.cat}</span>
+                  <button className={s.del} title="응답 취소(되돌리기)" onClick={(e) => markAnswered(p.id, false, e)}>↩</button>
+                  <button className={s.del} onClick={(e) => deletePrayer(p.id, e)}>x</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className={s.timer}>
         <div className={s.timerLabel}>기도 시간</div>
