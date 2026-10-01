@@ -237,6 +237,22 @@ export default function Prayer() {
         </div>
       </div>
 
+      <div className={s.timer}>
+        <div className={s.timerLabel}>기도 시간</div>
+        <div className={s.timerVal}>{fmt(elapsed)}</div>
+        <div className={s.timerBtns}>
+          <button className={s.tbtn} onClick={reset}>↺</button>
+          <button className={s.tbtn + (isRunning ? ' ' + s.running : '')} onClick={toggle}>
+            {isRunning ? '⏸' : '▶'}
+          </button>
+        </div>
+        {completed && <div className={s.timerDone}>🙏 기도 완료! 오늘도 수고하셨어요</div>}
+        {!completed && elapsed > 0 && !isRunning && (
+          <button className={s.completeBtn} onClick={complete}>기도 완료 — 저장하기</button>
+        )}
+        <div className={s.timerTotal}>누적 기도 시간 {fmt(totalSaved)}</div>
+      </div>
+
       <button className={s.addBtn} style={{ margin: '0 0 12px' }} onClick={() => { setNewCat(activeCat !== '전체' ? activeCat : (cats[0] || '가족')); setShowModal(true) }}>+ 기도 제목 추가</button>
 
       <div className={s.list}>
@@ -275,22 +291,6 @@ export default function Prayer() {
           )}
         </div>
       )}
-
-      <div className={s.timer}>
-        <div className={s.timerLabel}>기도 시간</div>
-        <div className={s.timerVal}>{fmt(elapsed)}</div>
-        <div className={s.timerBtns}>
-          <button className={s.tbtn} onClick={reset}>↺</button>
-          <button className={s.tbtn + (isRunning ? ' ' + s.running : '')} onClick={toggle}>
-            {isRunning ? '⏸' : '▶'}
-          </button>
-        </div>
-        {completed && <div className={s.timerDone}>🙏 기도 완료! 오늘도 수고하셨어요</div>}
-        {!completed && elapsed > 0 && !isRunning && (
-          <button className={s.completeBtn} onClick={complete}>기도 완료 — 저장하기</button>
-        )}
-        <div className={s.timerTotal}>누적 기도 시간 {fmt(totalSaved)}</div>
-      </div>
 
       {showModal && (
         <div className={s.overlay} onClick={() => setShowModal(false)}>
