@@ -50,6 +50,10 @@ export default function FamilyWorship() {
   const [editForm, setEditForm] = useState(emptyForm)
   const [editDate, setEditDate] = useState('')
   const [monthOpen, setMonthOpen] = useState({})
+  const [printPreview, setPrintPreview] = useState(null)  // { record, dataUrl }
+  const [printScale, setPrintScale] = useState(1)
+  const printCanvasRef = React.useRef(null)
+  const pinchRef = React.useRef({ startDist: 0, startScale: 1 })
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'familyworship'), snap => {
@@ -173,8 +177,8 @@ export default function FamilyWorship() {
     return canvas
   }
 
-  // 캔버스를 A4 PDF로 감싸기 (JPEG 삽입) — PDF라서 인쇄 시 크기 조절 가능
-  const canvasToPdfBlob = (canvas) => {
+  // 캔버스를 A4 PDF로 감싸기 (JPEG 삽입). scaleFactor로 출력 크기 조절(핀치 값)
+  const canvasToPdfBlob = (canvas, scaleFactor = 1) => {
     const dataUrl = canvas.toDataURL('image/jpeg', 0.92)
     const bin = atob(dataUrl.split(',')[1])
     const jpg = new Uint8Array(bin.length)
@@ -185,6 +189,7 @@ export default function FamilyWorship() {
     const aspect = iw / ih
     let sw = availW, sh = availW / aspect
     if (sh > availH) { sh = availH; sw = availH * aspect }
+    sw *= scaleFactor; sh *= scaleFactor
     const tx = (PW - sw) / 2, ty = (PH - sh) / 2
     const content = 'q ' + sw.toFixed(2) + ' 0 0 ' + sh.toFixed(2) + ' ' + tx.toFixed(2) + ' ' + ty.toFixed(2) + ' cm /Im0 Do Q'
     const enc = (s) => new TextEncoder().encode(s)
@@ -226,10 +231,39 @@ export default function FamilyWorship() {
 
   const printRecord = async (r) => {
     // Safari/데스크탑 브라우저: 웹페이지 인쇄창(크기 % 조절 항목 지원)
-    // 설치형 앱(홈 화면): 웹 인쇄가 막히므로 PDF 공유로 폴백
+    // 설치형 앱(홈 화면): 앱 안 미리보기에서 핀치로 크기 조절 후 PDF 공유
     if (isStandalone()) {
-      try { if (await sharePdf(r)) return } catch (e) { /* 아래 인쇄창으로 폴백 */ }
+      const canvas = renderWorshipCanvas(r)
+      printCanvasRef.current = canvas
+      setPrintScale(1)
+      setPrintPreview({ record: r, dataUrl: canvas.toDataURL('image/jpeg', 0.92) })
+      return
     }
+    printViaWindow(r)
+  }
+
+  // 핀치
+  const pinchDist = (touches) => Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY)
+  const onPinchStart = (e) => { if (e.touches.length === 2) pinchRef.current = { startDist: pinchDist(e.touches), startScale: printScale } }
+  const onPinchMove = (e) => {
+    if (e.touches.length === 2 && pinchRef.current.startDist > 0) {
+      const s = pinchRef.current.startScale * (pinchDist(e.touches) / pinchRef.current.startDist)
+      setPrintScale(Math.min(2.5, Math.max(0.5, s)))
+    }
+  }
+
+  const sharePreviewPdf = async () => {
+    const r = printPreview.record
+    const canvas = printCanvasRef.current
+    setPrintPreview(null)
+    try {
+      const pdf = canvasToPdfBlob(canvas, printScale)
+      const file = new File([pdf], '가정예배_' + r.date + '.pdf', { type: 'application/pdf' })
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try { await navigator.share({ files: [file], title: '가정예배 ' + r.date }) } catch (e) { /* 취소 */ }
+        return
+      }
+    } catch (e) { /* 폴백 */ }
     printViaWindow(r)
   }
 
@@ -365,6 +399,36 @@ export default function FamilyWorship() {
           </div>
         )
       })}
+
+      {printPreview && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0,0,0,0.75)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+          <div style={{ color: '#fff', fontSize: '13px', marginBottom: '10px', textAlign: 'center' }}>두 손가락으로 크기를 조절하세요</div>
+          <div
+            onTouchStart={onPinchStart} onTouchMove={onPinchMove}
+            style={{ width: 'min(80vw, 330px)', aspectRatio: '595.28 / 841.89', background: '#fff', borderRadius: '6px', overflow: 'hidden', position: 'relative', boxShadow: '0 8px 30px rgba(0,0,0,0.4)', touchAction: 'none' }}>
+            <div style={{ position: 'absolute', left: '4.7%', top: '3.33%', right: '4.7%', bottom: '3.33%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <img src={printPreview.dataUrl} alt="미리보기"
+                style={{ maxWidth: '100%', maxHeight: '100%', transform: 'scale(' + printScale + ')', transformOrigin: 'center center' }} />
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '16px 0 4px' }}>
+            <button onClick={() => setPrintScale(v => Math.max(0.5, Math.round((v - 0.1) * 10) / 10))}
+              style={{ width: '40px', height: '40px', borderRadius: '20px', border: 'none', background: 'rgba(255,255,255,0.2)', color: '#fff', fontSize: '22px', cursor: 'pointer' }}>−</button>
+            <span style={{ color: '#fff', fontSize: '15px', fontWeight: 700, minWidth: '56px', textAlign: 'center' }}>{Math.round(printScale * 100)}%</span>
+            <button onClick={() => setPrintScale(v => Math.min(2.5, Math.round((v + 0.1) * 10) / 10))}
+              style={{ width: '40px', height: '40px', borderRadius: '20px', border: 'none', background: 'rgba(255,255,255,0.2)', color: '#fff', fontSize: '22px', cursor: 'pointer' }}>+</button>
+          </div>
+          <input type="range" min="0.5" max="2.5" step="0.05" value={printScale}
+            onChange={e => setPrintScale(parseFloat(e.target.value))}
+            style={{ width: 'min(80vw, 330px)', margin: '4px 0 16px' }} />
+          <div style={{ display: 'flex', gap: '10px', width: 'min(80vw, 330px)' }}>
+            <button onClick={() => setPrintPreview(null)}
+              style={{ flex: 1, padding: '13px', borderRadius: '10px', border: 'none', background: 'rgba(255,255,255,0.18)', color: '#fff', fontSize: '15px', fontWeight: 700, cursor: 'pointer' }}>취소</button>
+            <button onClick={sharePreviewPdf}
+              style={{ flex: 2, padding: '13px', borderRadius: '10px', border: 'none', background: '#d4a55a', color: '#001f3f', fontSize: '15px', fontWeight: 700, cursor: 'pointer' }}>🖨 이 크기로 프린트</button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
