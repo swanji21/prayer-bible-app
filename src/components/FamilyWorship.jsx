@@ -156,9 +156,12 @@ export default function FamilyWorship() {
     blocks.push({ lines: ['🏠 가정예배'], font: FONT('700', 34), lh: 46, color: '#001f3f', mt: 0 })
     blocks.push({ lines: wrap(r.date + (r.ref ? ' · 본문: ' + r.ref : ''), FONT('400', 20)), font: FONT('400', 20), lh: 30, color: '#777', mt: 8 })
     SECTIONS.forEach(sec => {
-      if (!r[sec.key]) return
       blocks.push({ lines: [sec.label], font: FONT('700', 23), lh: 34, color: '#001f3f', mt: 26 })
-      blocks.push({ lines: wrap(r[sec.key], FONT('400', 22)), font: FONT('400', 22), lh: 34, color: '#222', mt: 4 })
+      const val = r[sec.key]
+      blocks.push({
+        lines: val ? wrap(val, FONT('400', 22)) : [''],   // 미입력 섹션도 제목+빈 줄로 표시
+        font: FONT('400', 22), lh: 34, color: val ? '#222' : '#999', mt: 4
+      })
     })
     let y = pad
     blocks.forEach(b => { y += b.mt + b.lines.length * b.lh })
