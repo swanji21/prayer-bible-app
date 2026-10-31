@@ -52,6 +52,7 @@ export default function FamilyWorship() {
   const [monthOpen, setMonthOpen] = useState({})
   const [printPreview, setPrintPreview] = useState(null)  // { record, dataUrl }
   const [printFontScale, setPrintFontScale] = useState(1)
+  const [fontInput, setFontInput] = useState('100')
   const printCanvasRef = React.useRef(null)
   const printRecordRef = React.useRef(null)
   const pinchRef = React.useRef({ startDist: 0, startScale: 1 })
@@ -282,6 +283,7 @@ export default function FamilyWorship() {
     const canvas = renderWorshipCanvas(r, fs)
     printCanvasRef.current = canvas
     setPrintFontScale(fs)
+    setFontInput(String(Math.round(fs * 100)))
     setPrintPreview({ record: r, dataUrl: canvas.toDataURL('image/jpeg', 0.92) })
   }
   const setFontScale = (fs) => buildPreview(printRecordRef.current, Math.min(1.8, Math.max(0.5, Math.round(fs * 100) / 100)))
@@ -454,14 +456,22 @@ export default function FamilyWorship() {
                 style={{ width: '100%', display: 'block' }} />
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '16px 0 4px' }}>
-            <button onClick={() => setFontScale(printFontScale - 0.1)}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '16px 0 4px' }}>
+            <button onClick={() => setFontScale(printFontScale - 0.05)}
               style={{ width: '40px', height: '40px', borderRadius: '20px', border: 'none', background: 'rgba(255,255,255,0.2)', color: '#fff', fontSize: '22px', cursor: 'pointer' }}>−</button>
-            <span style={{ color: '#fff', fontSize: '15px', fontWeight: 700, minWidth: '72px', textAlign: 'center' }}>글자 {Math.round(printFontScale * 100)}%</span>
-            <button onClick={() => setFontScale(printFontScale + 0.1)}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+              <span style={{ color: '#fff', fontSize: '13px' }}>글자</span>
+              <input type="number" inputMode="numeric" min="50" max="180" value={fontInput}
+                onChange={e => setFontInput(e.target.value)}
+                onBlur={() => setFontScale((parseInt(fontInput, 10) || 100) / 100)}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur() } }}
+                style={{ width: '56px', padding: '7px 4px', textAlign: 'center', fontSize: '15px', fontWeight: 700, borderRadius: '8px', border: 'none' }} />
+              <span style={{ color: '#fff', fontSize: '13px' }}>%</span>
+            </div>
+            <button onClick={() => setFontScale(printFontScale + 0.05)}
               style={{ width: '40px', height: '40px', borderRadius: '20px', border: 'none', background: 'rgba(255,255,255,0.2)', color: '#fff', fontSize: '22px', cursor: 'pointer' }}>+</button>
           </div>
-          <input type="range" min="0.5" max="1.8" step="0.05" value={printFontScale}
+          <input type="range" min="0.5" max="1.8" step="0.01" value={printFontScale}
             onChange={e => setFontScale(parseFloat(e.target.value))}
             style={{ width: 'min(80vw, 330px)', margin: '4px 0 16px' }} />
           <div style={{ display: 'flex', gap: '10px', width: 'min(80vw, 330px)' }}>
