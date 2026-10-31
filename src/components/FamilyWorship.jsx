@@ -128,6 +128,8 @@ export default function FamilyWorship() {
   }
 
   const printRecord = (r) => {
+    const w = window.open('', '_blank')
+    if (!w) { alert('팝업이 차단되어 있어요. 팝업을 허용해주세요.'); return }
     const body = SECTIONS.map(sec => {
       const val = r[sec.key]
       const content = val
@@ -135,7 +137,7 @@ export default function FamilyWorship() {
         : '<span class="empty">—</span>'
       return '<h2>' + sec.label + '</h2><p>' + content + '</p>'
     }).join('')
-    const html = '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>가정예배 ' + r.date + '</title>' +
+    w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>가정예배 ' + r.date + '</title>' +
       '<style>body{font-family:-apple-system,"Apple SD Gothic Neo",sans-serif;padding:0;color:#222;margin:0}' +
       '.content{padding:28px;max-width:700px;margin:0 auto}' +
       'h1{font-size:20px;border-bottom:2px solid #001f3f;padding-bottom:8px}' +
@@ -144,29 +146,20 @@ export default function FamilyWorship() {
       '.meta{color:#777;font-size:13px;margin-bottom:8px}' +
       '.empty{color:#bbb}' +
       '.bar{position:sticky;top:0;display:flex;gap:8px;padding:12px 16px;background:#001f3f;box-shadow:0 2px 8px rgba(0,0,0,0.15)}' +
-      '.bar button{flex:1;padding:14px;font-size:16px;font-weight:700;border:none;border-radius:8px;cursor:pointer}' +
+      '.bar button{flex:1;padding:12px;font-size:15px;font-weight:700;border:none;border-radius:8px;cursor:pointer}' +
       '.back{background:rgba(255,255,255,0.15);color:#fff}' +
       '.print{background:#d4a55a;color:#001f3f}' +
       '@media print{.bar{display:none}}</style></head><body>' +
       '<div class="bar">' +
-      '<button class="back" onclick="history.length>1?history.back():window.close()">← 돌아가기</button>' +
+      '<button class="back" onclick="window.close()">← 돌아가기</button>' +
       '<button class="print" onclick="window.print()">🖨 인쇄하기</button>' +
       '</div>' +
       '<div class="content">' +
       '<h1>🏠 가정예배</h1>' +
       '<p class="meta">' + r.date + (r.ref ? ' · 본문: ' + r.ref : '') + '</p>' +
-      body + '</div></body></html>'
-
-    // 설치형 PWA(iOS)에서는 window.open('',...)/iframe 인쇄가 조용히 막힘.
-    // 실제 문서 URL(blob)을 새 탭/Safari로 열어, 거기서 "인쇄하기"를 누르게 함.
-    const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }))
-    const win = window.open(url, '_blank')
-    if (!win) {
-      const a = document.createElement('a')
-      a.href = url; a.target = '_blank'; a.rel = 'noopener'
-      document.body.appendChild(a); a.click(); document.body.removeChild(a)
-    }
-    setTimeout(() => URL.revokeObjectURL(url), 60000)
+      body + '</div></body></html>')
+    w.document.close()
+    w.focus()
   }
 
   return (
