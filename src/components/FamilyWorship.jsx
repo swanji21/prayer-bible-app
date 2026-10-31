@@ -51,8 +51,9 @@ export default function FamilyWorship() {
   const [editDate, setEditDate] = useState('')
   const [monthOpen, setMonthOpen] = useState({})
   const [printPreview, setPrintPreview] = useState(null)  // { record, dataUrl }
-  const [printScale, setPrintScale] = useState(1)
+  const [printFontScale, setPrintFontScale] = useState(1)
   const printCanvasRef = React.useRef(null)
+  const printRecordRef = React.useRef(null)
   const pinchRef = React.useRef({ startDist: 0, startScale: 1 })
 
   useEffect(() => {
@@ -131,13 +132,14 @@ export default function FamilyWorship() {
     } catch (e) { /* 사용자가 공유 취소 */ }
   }
 
-  // 예배지를 캔버스에 렌더 (고해상도)
-  const renderWorshipCanvas = (r) => {
+  // 예배지를 캔버스에 렌더 (고해상도). fs = 글자 배율(폭은 항상 꽉 채움)
+  const renderWorshipCanvas = (r, fs = 1) => {
     const scale = Math.min(window.devicePixelRatio || 1, 3)
     const W = 820, pad = 48, contentW = W - pad * 2
     const canvas = document.createElement('canvas')
     const ctx = canvas.getContext('2d')
-    const FONT = (w, sz) => w + ' ' + sz + 'px -apple-system, "Apple SD Gothic Neo", sans-serif'
+    const FONT = (w, sz) => w + ' ' + (sz * fs) + 'px -apple-system, "Apple SD Gothic Neo", sans-serif'
+    const L = (n) => n * fs   // 줄높이/간격도 배율 적용
     const wrap = (text, font) => {
       ctx.font = font
       const out = []
@@ -154,19 +156,19 @@ export default function FamilyWorship() {
     }
     const blocks = []
     // 제목 + 하단 구분선
-    blocks.push({ lines: ['🏠 가정예배'], font: FONT('700', 30), lh: 42, color: '#001f3f', mt: 0, rule: true })
+    blocks.push({ lines: ['🏠 가정예배'], font: FONT('700', 30), lh: L(42), color: '#001f3f', mt: 0, rule: true })
     // 날짜 · 본문
-    blocks.push({ lines: wrap(r.date + (r.ref ? ' · 본문: ' + r.ref : ''), FONT('400', 19)), font: FONT('400', 19), lh: 28, color: '#777', mt: 10 })
+    blocks.push({ lines: wrap(r.date + (r.ref ? ' · 본문: ' + r.ref : ''), FONT('400', 19)), font: FONT('400', 19), lh: L(28), color: '#777', mt: L(10) })
     SECTIONS.forEach(sec => {
       // 섹션 제목(금색 세로 막대 + 남색 글씨)
-      blocks.push({ lines: [sec.label], font: FONT('700', 22), lh: 32, color: '#001f3f', mt: 24, bar: true })
+      blocks.push({ lines: [sec.label], font: FONT('700', 22), lh: L(32), color: '#001f3f', mt: L(24), bar: true })
       const val = r[sec.key]
       blocks.push({
         lines: val ? wrap(val, FONT('400', 21)) : [''],   // 미입력 섹션도 제목+빈 줄로 표시
-        font: FONT('400', 21), lh: 33, color: val ? '#222' : '#999', mt: 4
+        font: FONT('400', 21), lh: L(33), color: val ? '#222' : '#999', mt: L(4)
       })
     })
-    const advance = (b) => b.mt + b.lines.length * b.lh + (b.rule ? 16 : 0)
+    const advance = (b) => b.mt + b.lines.length * b.lh + (b.rule ? L(16) : 0)
     let H = pad
     blocks.forEach(b => { H += advance(b) })
     H += pad
@@ -185,7 +187,7 @@ export default function FamilyWorship() {
       if (b.rule) {
         ctx.strokeStyle = '#001f3f'; ctx.lineWidth = 2
         ctx.beginPath(); ctx.moveTo(pad, y + 7); ctx.lineTo(W - pad, y + 7); ctx.stroke()
-        y += 16
+        y += L(16)
       }
     })
     return canvas
@@ -268,22 +270,28 @@ export default function FamilyWorship() {
     // Safari/데스크탑 브라우저: 웹페이지 인쇄창(크기 % 조절 항목 지원)
     // 설치형 앱(홈 화면): 앱 안 미리보기에서 핀치로 크기 조절 후 PDF 공유
     if (isStandalone()) {
-      const canvas = renderWorshipCanvas(r)
-      printCanvasRef.current = canvas
-      setPrintScale(1)
-      setPrintPreview({ record: r, dataUrl: canvas.toDataURL('image/jpeg', 0.92) })
+      printRecordRef.current = r
+      buildPreview(r, 1)
       return
     }
     printViaWindow(r)
   }
 
-  // 핀치
+  // 글자 배율에 맞춰 캔버스 재렌더 + 미리보기 갱신 (폭은 항상 꽉 채움)
+  const buildPreview = (r, fs) => {
+    const canvas = renderWorshipCanvas(r, fs)
+    printCanvasRef.current = canvas
+    setPrintFontScale(fs)
+    setPrintPreview({ record: r, dataUrl: canvas.toDataURL('image/jpeg', 0.92) })
+  }
+  const setFontScale = (fs) => buildPreview(printRecordRef.current, Math.min(1.8, Math.max(0.5, Math.round(fs * 100) / 100)))
+
+  // 핀치 → 글자 크기 조절
   const pinchDist = (touches) => Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY)
-  const onPinchStart = (e) => { if (e.touches.length === 2) pinchRef.current = { startDist: pinchDist(e.touches), startScale: printScale } }
+  const onPinchStart = (e) => { if (e.touches.length === 2) pinchRef.current = { startDist: pinchDist(e.touches), startScale: printFontScale } }
   const onPinchMove = (e) => {
     if (e.touches.length === 2 && pinchRef.current.startDist > 0) {
-      const s = pinchRef.current.startScale * (pinchDist(e.touches) / pinchRef.current.startDist)
-      setPrintScale(Math.min(2.5, Math.max(0.5, s)))
+      setFontScale(pinchRef.current.startScale * (pinchDist(e.touches) / pinchRef.current.startDist))
     }
   }
 
@@ -292,7 +300,7 @@ export default function FamilyWorship() {
     const canvas = printCanvasRef.current
     setPrintPreview(null)
     try {
-      const pdf = canvasToPdfBlob(canvas, printScale)
+      const pdf = canvasToPdfBlob(canvas)   // 폭 꽉 채움 + 길면 페이지 분할
       const file = new File([pdf], '가정예배_' + r.date + '.pdf', { type: 'application/pdf' })
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
         try { await navigator.share({ files: [file], title: '가정예배 ' + r.date }) } catch (e) { /* 취소 */ }
@@ -437,24 +445,24 @@ export default function FamilyWorship() {
 
       {printPreview && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0,0,0,0.75)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
-          <div style={{ color: '#fff', fontSize: '13px', marginBottom: '10px', textAlign: 'center' }}>두 손가락으로 크기를 조절하세요</div>
+          <div style={{ color: '#fff', fontSize: '13px', marginBottom: '10px', textAlign: 'center' }}>두 손가락으로 글자 크기를 조절하세요<br/><span style={{ opacity: 0.6, fontSize: '11px' }}>(가로 폭은 항상 꽉 채워 인쇄됩니다)</span></div>
           <div
             onTouchStart={onPinchStart} onTouchMove={onPinchMove}
             style={{ width: 'min(80vw, 330px)', aspectRatio: '595.28 / 841.89', background: '#fff', borderRadius: '6px', overflow: 'hidden', position: 'relative', boxShadow: '0 8px 30px rgba(0,0,0,0.4)', touchAction: 'none' }}>
             <div style={{ position: 'absolute', left: '4.7%', top: '3.33%', right: '4.7%', bottom: '3.33%', overflow: 'hidden' }}>
               <img src={printPreview.dataUrl} alt="미리보기"
-                style={{ width: (printScale * 100) + '%', display: 'block', margin: '0 auto' }} />
+                style={{ width: '100%', display: 'block' }} />
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '16px 0 4px' }}>
-            <button onClick={() => setPrintScale(v => Math.max(0.5, Math.round((v - 0.1) * 10) / 10))}
+            <button onClick={() => setFontScale(printFontScale - 0.1)}
               style={{ width: '40px', height: '40px', borderRadius: '20px', border: 'none', background: 'rgba(255,255,255,0.2)', color: '#fff', fontSize: '22px', cursor: 'pointer' }}>−</button>
-            <span style={{ color: '#fff', fontSize: '15px', fontWeight: 700, minWidth: '56px', textAlign: 'center' }}>{Math.round(printScale * 100)}%</span>
-            <button onClick={() => setPrintScale(v => Math.min(2.5, Math.round((v + 0.1) * 10) / 10))}
+            <span style={{ color: '#fff', fontSize: '15px', fontWeight: 700, minWidth: '72px', textAlign: 'center' }}>글자 {Math.round(printFontScale * 100)}%</span>
+            <button onClick={() => setFontScale(printFontScale + 0.1)}
               style={{ width: '40px', height: '40px', borderRadius: '20px', border: 'none', background: 'rgba(255,255,255,0.2)', color: '#fff', fontSize: '22px', cursor: 'pointer' }}>+</button>
           </div>
-          <input type="range" min="0.5" max="2.5" step="0.05" value={printScale}
-            onChange={e => setPrintScale(parseFloat(e.target.value))}
+          <input type="range" min="0.5" max="1.8" step="0.05" value={printFontScale}
+            onChange={e => setFontScale(parseFloat(e.target.value))}
             style={{ width: 'min(80vw, 330px)', margin: '4px 0 16px' }} />
           <div style={{ display: 'flex', gap: '10px', width: 'min(80vw, 330px)' }}>
             <button onClick={() => setPrintPreview(null)}
