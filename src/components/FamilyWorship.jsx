@@ -127,8 +127,8 @@ export default function FamilyWorship() {
     } catch (e) { /* 사용자가 공유 취소 */ }
   }
 
-  // 예배지를 이미지(PNG)로 렌더 — iOS 공유 시트의 "프린트"로 출력하기 위함
-  const renderWorshipImage = async (r) => {
+  // 예배지를 캔버스에 렌더 (고해상도)
+  const renderWorshipCanvas = (r) => {
     const scale = Math.min(window.devicePixelRatio || 1, 3)
     const W = 820, pad = 48, contentW = W - pad * 2
     const canvas = document.createElement('canvas')
@@ -170,20 +170,56 @@ export default function FamilyWorship() {
       ctx.font = b.font; ctx.fillStyle = b.color
       b.lines.forEach(line => { ctx.fillText(line, pad, y); y += b.lh })
     })
-    const blob = await new Promise(res => canvas.toBlob(res, 'image/png'))
-    return blob ? new File([blob], '가정예배_' + r.date + '.png', { type: 'image/png' }) : null
+    return canvas
+  }
+
+  // 캔버스를 A4 PDF로 감싸기 (JPEG 삽입) — PDF라서 인쇄 시 크기 조절 가능
+  const canvasToPdfBlob = (canvas) => {
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.92)
+    const bin = atob(dataUrl.split(',')[1])
+    const jpg = new Uint8Array(bin.length)
+    for (let i = 0; i < bin.length; i++) jpg[i] = bin.charCodeAt(i)
+    const iw = canvas.width, ih = canvas.height
+    const PW = 595.28, PH = 841.89, m = 28
+    const availW = PW - m * 2, availH = PH - m * 2
+    const aspect = iw / ih
+    let sw = availW, sh = availW / aspect
+    if (sh > availH) { sh = availH; sw = availH * aspect }
+    const tx = (PW - sw) / 2, ty = (PH - sh) / 2
+    const content = 'q ' + sw.toFixed(2) + ' 0 0 ' + sh.toFixed(2) + ' ' + tx.toFixed(2) + ' ' + ty.toFixed(2) + ' cm /Im0 Do Q'
+    const enc = (s) => new TextEncoder().encode(s)
+    const parts = []; let len = 0; const off = {}
+    const push = (u8) => { parts.push(u8); len += u8.length }
+    const pStr = (s) => push(enc(s))
+    const obj = (n) => { off[n] = len }
+    pStr('%PDF-1.4\n')
+    obj(1); pStr('1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n')
+    obj(2); pStr('2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n')
+    obj(3); pStr('3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + PW + ' ' + PH + '] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>\nendobj\n')
+    obj(4); pStr('4 0 obj\n<< /Type /XObject /Subtype /Image /Width ' + iw + ' /Height ' + ih + ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' + jpg.length + ' >>\nstream\n')
+    push(jpg); pStr('\nendstream\nendobj\n')
+    obj(5); pStr('5 0 obj\n<< /Length ' + content.length + ' >>\nstream\n' + content + '\nendstream\nendobj\n')
+    const xrefStart = len
+    let xref = 'xref\n0 6\n0000000000 65535 f \n'
+    for (let n = 1; n <= 5; n++) xref += String(off[n]).padStart(10, '0') + ' 00000 n \n'
+    pStr(xref)
+    pStr('trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n' + xrefStart + '\n%%EOF')
+    const total = new Uint8Array(len); let o = 0
+    parts.forEach(p => { total.set(p, o); o += p.length })
+    return new Blob([total], { type: 'application/pdf' })
   }
 
   const printRecord = async (r) => {
-    // iOS 설치형 앱 등: 공유 시트에 이미지 → "프린트" 선택이 가장 확실
+    // iOS 설치형 앱 등: 공유 시트로 PDF → "프린트"(크기 조절 가능)
     try {
-      const file = await renderWorshipImage(r)
-      if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+      const pdf = canvasToPdfBlob(renderWorshipCanvas(r))
+      const file = new File([pdf], '가정예배_' + r.date + '.pdf', { type: 'application/pdf' })
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
         try { await navigator.share({ files: [file], title: '가정예배 ' + r.date }) }
         catch (e) { /* 사용자가 취소 */ }
         return
       }
-    } catch (e) { /* 이미지 생성 실패 시 아래 인쇄창으로 폴백 */ }
+    } catch (e) { /* 생성 실패 시 아래 인쇄창으로 폴백 */ }
 
     // 폴백: 데스크탑/Safari 등 — 인쇄 창
     const w = window.open('', '_blank')
