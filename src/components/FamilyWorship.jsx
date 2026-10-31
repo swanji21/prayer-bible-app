@@ -153,68 +153,100 @@ export default function FamilyWorship() {
       return out
     }
     const blocks = []
-    blocks.push({ lines: ['🏠 가정예배'], font: FONT('700', 34), lh: 46, color: '#001f3f', mt: 0 })
-    blocks.push({ lines: wrap(r.date + (r.ref ? ' · 본문: ' + r.ref : ''), FONT('400', 20)), font: FONT('400', 20), lh: 30, color: '#777', mt: 8 })
+    // 제목 + 하단 구분선
+    blocks.push({ lines: ['🏠 가정예배'], font: FONT('700', 30), lh: 42, color: '#001f3f', mt: 0, rule: true })
+    // 날짜 · 본문
+    blocks.push({ lines: wrap(r.date + (r.ref ? ' · 본문: ' + r.ref : ''), FONT('400', 19)), font: FONT('400', 19), lh: 28, color: '#777', mt: 10 })
     SECTIONS.forEach(sec => {
-      blocks.push({ lines: [sec.label], font: FONT('700', 23), lh: 34, color: '#001f3f', mt: 26 })
+      // 섹션 제목(금색 세로 막대 + 남색 글씨)
+      blocks.push({ lines: [sec.label], font: FONT('700', 22), lh: 32, color: '#001f3f', mt: 24, bar: true })
       const val = r[sec.key]
       blocks.push({
-        lines: val ? wrap(val, FONT('400', 22)) : [''],   // 미입력 섹션도 제목+빈 줄로 표시
-        font: FONT('400', 22), lh: 34, color: val ? '#222' : '#999', mt: 4
+        lines: val ? wrap(val, FONT('400', 21)) : [''],   // 미입력 섹션도 제목+빈 줄로 표시
+        font: FONT('400', 21), lh: 33, color: val ? '#222' : '#999', mt: 4
       })
     })
-    let y = pad
-    blocks.forEach(b => { y += b.mt + b.lines.length * b.lh })
-    const H = y + pad
+    const advance = (b) => b.mt + b.lines.length * b.lh + (b.rule ? 16 : 0)
+    let H = pad
+    blocks.forEach(b => { H += advance(b) })
+    H += pad
     canvas.width = Math.round(W * scale)
     canvas.height = Math.round(H * scale)
     ctx.scale(scale, scale)
     ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H)
     ctx.textBaseline = 'top'
-    y = pad
+    let y = pad
     blocks.forEach(b => {
       y += b.mt
+      if (b.bar) { ctx.fillStyle = '#d4a55a'; ctx.fillRect(pad, y + 3, 4, b.lh - 8) }
+      const tx = b.bar ? pad + 14 : pad
       ctx.font = b.font; ctx.fillStyle = b.color
-      b.lines.forEach(line => { ctx.fillText(line, pad, y); y += b.lh })
+      b.lines.forEach(line => { ctx.fillText(line, tx, y); y += b.lh })
+      if (b.rule) {
+        ctx.strokeStyle = '#001f3f'; ctx.lineWidth = 2
+        ctx.beginPath(); ctx.moveTo(pad, y + 7); ctx.lineTo(W - pad, y + 7); ctx.stroke()
+        y += 16
+      }
     })
     return canvas
   }
 
-  // 캔버스를 A4 PDF로 감싸기 (JPEG 삽입). scaleFactor로 출력 크기 조절(핀치 값)
-  const canvasToPdfBlob = (canvas, scaleFactor = 1) => {
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.92)
-    const bin = atob(dataUrl.split(',')[1])
-    const jpg = new Uint8Array(bin.length)
-    for (let i = 0; i < bin.length; i++) jpg[i] = bin.charCodeAt(i)
-    const iw = canvas.width, ih = canvas.height
+  // 캔버스를 A4 PDF로 — 페이지 폭을 가득 채우고, 길면 여러 페이지로 분할.
+  // scaleFactor: 핀치 배율(1 = 폭 꽉 채움)
+  const canvasToPdfBlob = (srcCanvas, scaleFactor = 1) => {
     const PW = 595.28, PH = 841.89, m = 28
     const availW = PW - m * 2, availH = PH - m * 2
-    const aspect = iw / ih
-    let sw = availW, sh = availW / aspect
-    if (sh > availH) { sh = availH; sw = availH * aspect }
-    sw *= scaleFactor; sh *= scaleFactor
-    const tx = (PW - sw) / 2, ty = (PH - sh) / 2
-    const content = 'q ' + sw.toFixed(2) + ' 0 0 ' + sh.toFixed(2) + ' ' + tx.toFixed(2) + ' ' + ty.toFixed(2) + ' cm /Im0 Do Q'
+    const W = srcCanvas.width, H = srcCanvas.height
+    const f = (availW / W) * scaleFactor          // 소스 px → pt (폭 채움 × 핀치)
+    const drawW = W * f                            // 그려질 가로 폭(pt)
+    const pageHpx = Math.max(1, Math.floor(availH / f))  // 한 페이지에 담기는 소스 세로 px
+    const pageCount = Math.max(1, Math.ceil(H / pageHpx))
+
+    // 페이지별 JPEG 슬라이스
+    const slices = []
+    for (let p = 0; p < pageCount; p++) {
+      const sy = p * pageHpx
+      const hpx = Math.min(pageHpx, H - sy)
+      const pc = document.createElement('canvas')
+      pc.width = W; pc.height = hpx
+      const pctx = pc.getContext('2d')
+      pctx.fillStyle = '#fff'; pctx.fillRect(0, 0, W, hpx)
+      pctx.drawImage(srcCanvas, 0, sy, W, hpx, 0, 0, W, hpx)
+      const b64 = pc.toDataURL('image/jpeg', 0.92).split(',')[1]
+      const bin = atob(b64)
+      const jpg = new Uint8Array(bin.length)
+      for (let i = 0; i < bin.length; i++) jpg[i] = bin.charCodeAt(i)
+      slices.push({ jpg, hpx })
+    }
+
     const enc = (s) => new TextEncoder().encode(s)
     const parts = []; let len = 0; const off = {}
     const push = (u8) => { parts.push(u8); len += u8.length }
     const pStr = (s) => push(enc(s))
     const obj = (n) => { off[n] = len }
+    const total_objs = 2 + pageCount * 3
     pStr('%PDF-1.4\n')
     obj(1); pStr('1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n')
-    obj(2); pStr('2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n')
-    obj(3); pStr('3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + PW + ' ' + PH + '] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>\nendobj\n')
-    obj(4); pStr('4 0 obj\n<< /Type /XObject /Subtype /Image /Width ' + iw + ' /Height ' + ih + ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' + jpg.length + ' >>\nstream\n')
-    push(jpg); pStr('\nendstream\nendobj\n')
-    obj(5); pStr('5 0 obj\n<< /Length ' + content.length + ' >>\nstream\n' + content + '\nendstream\nendobj\n')
+    const kids = slices.map((_, p) => (3 + p * 3) + ' 0 R').join(' ')
+    obj(2); pStr('2 0 obj\n<< /Type /Pages /Kids [' + kids + '] /Count ' + pageCount + ' >>\nendobj\n')
+    slices.forEach((sl, p) => {
+      const pageN = 3 + p * 3, imgN = 4 + p * 3, contN = 5 + p * 3
+      const drawH = sl.hpx * f
+      const tx = m, ty = PH - m - drawH   // 위 여백부터 아래로
+      const content = 'q ' + drawW.toFixed(2) + ' 0 0 ' + drawH.toFixed(2) + ' ' + tx.toFixed(2) + ' ' + ty.toFixed(2) + ' cm /Im0 Do Q'
+      obj(pageN); pStr(pageN + ' 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + PW + ' ' + PH + '] /Resources << /XObject << /Im0 ' + imgN + ' 0 R >> >> /Contents ' + contN + ' 0 R >>\nendobj\n')
+      obj(imgN); pStr(imgN + ' 0 obj\n<< /Type /XObject /Subtype /Image /Width ' + W + ' /Height ' + sl.hpx + ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' + sl.jpg.length + ' >>\nstream\n')
+      push(sl.jpg); pStr('\nendstream\nendobj\n')
+      obj(contN); pStr(contN + ' 0 obj\n<< /Length ' + content.length + ' >>\nstream\n' + content + '\nendstream\nendobj\n')
+    })
     const xrefStart = len
-    let xref = 'xref\n0 6\n0000000000 65535 f \n'
-    for (let n = 1; n <= 5; n++) xref += String(off[n]).padStart(10, '0') + ' 00000 n \n'
+    let xref = 'xref\n0 ' + (total_objs + 1) + '\n0000000000 65535 f \n'
+    for (let n = 1; n <= total_objs; n++) xref += String(off[n]).padStart(10, '0') + ' 00000 n \n'
     pStr(xref)
-    pStr('trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n' + xrefStart + '\n%%EOF')
-    const total = new Uint8Array(len); let o = 0
-    parts.forEach(p => { total.set(p, o); o += p.length })
-    return new Blob([total], { type: 'application/pdf' })
+    pStr('trailer\n<< /Size ' + (total_objs + 1) + ' /Root 1 0 R >>\nstartxref\n' + xrefStart + '\n%%EOF')
+    const out = new Uint8Array(len); let o = 0
+    parts.forEach(p => { out.set(p, o); o += p.length })
+    return new Blob([out], { type: 'application/pdf' })
   }
 
   // 설치형 앱(standalone) 여부 — iOS 홈 화면 앱은 웹페이지 인쇄가 막혀 공유 방식이 필요
@@ -409,9 +441,9 @@ export default function FamilyWorship() {
           <div
             onTouchStart={onPinchStart} onTouchMove={onPinchMove}
             style={{ width: 'min(80vw, 330px)', aspectRatio: '595.28 / 841.89', background: '#fff', borderRadius: '6px', overflow: 'hidden', position: 'relative', boxShadow: '0 8px 30px rgba(0,0,0,0.4)', touchAction: 'none' }}>
-            <div style={{ position: 'absolute', left: '4.7%', top: '3.33%', right: '4.7%', bottom: '3.33%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ position: 'absolute', left: '4.7%', top: '3.33%', right: '4.7%', bottom: '3.33%', overflow: 'hidden' }}>
               <img src={printPreview.dataUrl} alt="미리보기"
-                style={{ maxWidth: '100%', maxHeight: '100%', transform: 'scale(' + printScale + ')', transformOrigin: 'center center' }} />
+                style={{ width: (printScale * 100) + '%', display: 'block', margin: '0 auto' }} />
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '16px 0 4px' }}>
