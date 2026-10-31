@@ -209,21 +209,37 @@ export default function FamilyWorship() {
     return new Blob([total], { type: 'application/pdf' })
   }
 
-  const printRecord = async (r) => {
-    // iOS 설치형 앱 등: 공유 시트로 PDF → "프린트"(크기 조절 가능)
-    try {
-      const pdf = canvasToPdfBlob(renderWorshipCanvas(r))
-      const file = new File([pdf], '가정예배_' + r.date + '.pdf', { type: 'application/pdf' })
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        try { await navigator.share({ files: [file], title: '가정예배 ' + r.date }) }
-        catch (e) { /* 사용자가 취소 */ }
-        return
-      }
-    } catch (e) { /* 생성 실패 시 아래 인쇄창으로 폴백 */ }
+  // 설치형 앱(standalone) 여부 — iOS 홈 화면 앱은 웹페이지 인쇄가 막혀 공유 방식이 필요
+  const isStandalone = () =>
+    (typeof window !== 'undefined') &&
+    ((window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true)
 
-    // 폴백: 데스크탑/Safari 등 — 인쇄 창
+  const sharePdf = async (r) => {
+    const pdf = canvasToPdfBlob(renderWorshipCanvas(r))
+    const file = new File([pdf], '가정예배_' + r.date + '.pdf', { type: 'application/pdf' })
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file], title: '가정예배 ' + r.date }) } catch (e) { /* 취소 */ }
+      return true
+    }
+    return false
+  }
+
+  const printRecord = async (r) => {
+    // Safari/데스크탑 브라우저: 웹페이지 인쇄창(크기 % 조절 항목 지원)
+    // 설치형 앱(홈 화면): 웹 인쇄가 막히므로 PDF 공유로 폴백
+    if (isStandalone()) {
+      try { if (await sharePdf(r)) return } catch (e) { /* 아래 인쇄창으로 폴백 */ }
+    }
+    printViaWindow(r)
+  }
+
+  const printViaWindow = (r) => {
     const w = window.open('', '_blank')
-    if (!w) { alert('팝업이 차단되어 있어요. 팝업을 허용해주세요.'); return }
+    if (!w) {
+      // 홈 화면 앱 등에서 새 창이 막히면 PDF 공유로 우회
+      sharePdf(r).then(ok => { if (!ok) alert('인쇄 창을 열 수 없어요. Safari에서 열어 인쇄해 주세요.') })
+      return
+    }
     const body = SECTIONS.map(sec => {
       const val = r[sec.key]
       const content = val
