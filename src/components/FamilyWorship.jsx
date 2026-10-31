@@ -142,29 +142,31 @@ export default function FamilyWorship() {
       'h2{font-size:15px;color:#001f3f;margin:18px 0 4px;border-left:3px solid #d4a55a;padding-left:8px}' +
       'p{margin:4px 0;font-size:14px;line-height:1.7}' +
       '.meta{color:#777;font-size:13px;margin-bottom:8px}' +
-      '.empty{color:#bbb}</style></head><body>' +
+      '.empty{color:#bbb}' +
+      '.bar{position:sticky;top:0;display:flex;gap:8px;padding:12px 16px;background:#001f3f;box-shadow:0 2px 8px rgba(0,0,0,0.15)}' +
+      '.bar button{flex:1;padding:14px;font-size:16px;font-weight:700;border:none;border-radius:8px;cursor:pointer}' +
+      '.back{background:rgba(255,255,255,0.15);color:#fff}' +
+      '.print{background:#d4a55a;color:#001f3f}' +
+      '@media print{.bar{display:none}}</style></head><body>' +
+      '<div class="bar">' +
+      '<button class="back" onclick="history.length>1?history.back():window.close()">← 돌아가기</button>' +
+      '<button class="print" onclick="window.print()">🖨 인쇄하기</button>' +
+      '</div>' +
       '<div class="content">' +
       '<h1>🏠 가정예배</h1>' +
       '<p class="meta">' + r.date + (r.ref ? ' · 본문: ' + r.ref : '') + '</p>' +
       body + '</div></body></html>'
 
-    // 팝업(window.open)은 설치형 PWA/모바일에서 막히는 경우가 많아, 숨긴 iframe으로 인쇄
-    const iframe = document.createElement('iframe')
-    iframe.setAttribute('aria-hidden', 'true')
-    iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;'
-    const cleanup = () => { setTimeout(() => { try { document.body.removeChild(iframe) } catch (e) {} }, 800) }
-    iframe.onload = () => {
-      try {
-        const win = iframe.contentWindow
-        win.focus()
-        win.onafterprint = cleanup
-        win.print()
-      } catch (e) { cleanup() }
-      setTimeout(cleanup, 60000)
+    // 설치형 PWA(iOS)에서는 window.open('',...)/iframe 인쇄가 조용히 막힘.
+    // 실제 문서 URL(blob)을 새 탭/Safari로 열어, 거기서 "인쇄하기"를 누르게 함.
+    const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }))
+    const win = window.open(url, '_blank')
+    if (!win) {
+      const a = document.createElement('a')
+      a.href = url; a.target = '_blank'; a.rel = 'noopener'
+      document.body.appendChild(a); a.click(); document.body.removeChild(a)
     }
-    document.body.appendChild(iframe)
-    const d = iframe.contentWindow.document
-    d.open(); d.write(html); d.close()
+    setTimeout(() => URL.revokeObjectURL(url), 60000)
   }
 
   return (
