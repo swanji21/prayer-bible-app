@@ -128,8 +128,6 @@ export default function FamilyWorship() {
   }
 
   const printRecord = (r) => {
-    const w = window.open('', '_blank')
-    if (!w) { alert('팝업이 차단되어 있어요. 팝업을 허용해주세요.'); return }
     const body = SECTIONS.map(sec => {
       const val = r[sec.key]
       const content = val
@@ -137,29 +135,36 @@ export default function FamilyWorship() {
         : '<span class="empty">—</span>'
       return '<h2>' + sec.label + '</h2><p>' + content + '</p>'
     }).join('')
-    w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>가정예배 ' + r.date + '</title>' +
+    const html = '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>가정예배 ' + r.date + '</title>' +
       '<style>body{font-family:-apple-system,"Apple SD Gothic Neo",sans-serif;padding:0;color:#222;margin:0}' +
       '.content{padding:28px;max-width:700px;margin:0 auto}' +
       'h1{font-size:20px;border-bottom:2px solid #001f3f;padding-bottom:8px}' +
       'h2{font-size:15px;color:#001f3f;margin:18px 0 4px;border-left:3px solid #d4a55a;padding-left:8px}' +
       'p{margin:4px 0;font-size:14px;line-height:1.7}' +
       '.meta{color:#777;font-size:13px;margin-bottom:8px}' +
-      '.empty{color:#bbb}' +
-      '.bar{position:sticky;top:0;display:flex;gap:8px;padding:12px 16px;background:#001f3f;box-shadow:0 2px 8px rgba(0,0,0,0.15)}' +
-      '.bar button{flex:1;padding:12px;font-size:15px;font-weight:700;border:none;border-radius:8px;cursor:pointer}' +
-      '.back{background:rgba(255,255,255,0.15);color:#fff}' +
-      '.print{background:#d4a55a;color:#001f3f}' +
-      '@media print{.bar{display:none}}</style></head><body>' +
-      '<div class="bar">' +
-      '<button class="back" onclick="window.close()">← 돌아가기</button>' +
-      '<button class="print" onclick="window.print()">🖨 인쇄하기</button>' +
-      '</div>' +
+      '.empty{color:#bbb}</style></head><body>' +
       '<div class="content">' +
       '<h1>🏠 가정예배</h1>' +
       '<p class="meta">' + r.date + (r.ref ? ' · 본문: ' + r.ref : '') + '</p>' +
-      body + '</div></body></html>')
-    w.document.close()
-    w.focus()
+      body + '</div></body></html>'
+
+    // 팝업(window.open)은 설치형 PWA/모바일에서 막히는 경우가 많아, 숨긴 iframe으로 인쇄
+    const iframe = document.createElement('iframe')
+    iframe.setAttribute('aria-hidden', 'true')
+    iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;'
+    const cleanup = () => { setTimeout(() => { try { document.body.removeChild(iframe) } catch (e) {} }, 800) }
+    iframe.onload = () => {
+      try {
+        const win = iframe.contentWindow
+        win.focus()
+        win.onafterprint = cleanup
+        win.print()
+      } catch (e) { cleanup() }
+      setTimeout(cleanup, 60000)
+    }
+    document.body.appendChild(iframe)
+    const d = iframe.contentWindow.document
+    d.open(); d.write(html); d.close()
   }
 
   return (

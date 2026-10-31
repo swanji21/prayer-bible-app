@@ -62,6 +62,7 @@ export default function Memory() {
 
   const [showCatMgr, setShowCatMgr] = useState(false)
   const [newTopicName, setNewTopicName] = useState('')
+  const [inlineTopic, setInlineTopic] = useState('')
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'memory'), snap => {
@@ -110,11 +111,20 @@ export default function Memory() {
     await saveTopics(next)
   }
 
+  // 추가 화면에서 새 주제를 바로 만들고 선택
+  const addInlineTopic = async () => {
+    const name = inlineTopic.trim()
+    if (!name) return
+    if (!topics.includes(name)) await saveTopics([...topics, name])
+    setNewTopic(name)
+    setInlineTopic('')
+  }
+
   const addVerse = async () => {
     if (!newText.trim()) return
     const topic = topics.includes(newTopic) ? newTopic : (topics[0] || '기타')
     await addDoc(collection(db, 'memory'), { text: newText.trim(), topic, book: newBook })
-    setNewText(''); setNewTopic(topics[0] || '구원'); setNewBook(''); setShowModal(false)
+    setNewText(''); setNewTopic(topics[0] || '구원'); setNewBook(''); setInlineTopic(''); setShowModal(false)
   }
 
   const deleteVerse = async (id) => {
@@ -305,7 +315,12 @@ export default function Memory() {
                 <button key={c} className={s.catBtn + (newTopic === c ? ' ' + s.catSel : '')} onClick={() => setNewTopic(c)}>{c}</button>
               ))}
             </div>
-            <div style={{ fontSize: '12px', color: 'var(--text2)', margin: '2px 0 6px' }}>성경 (선택)</div>
+            <div style={{ display: 'flex', gap: '6px', margin: '8px 0 2px' }}>
+              <input className={s.sheetInput} style={{ flex: 1, margin: 0 }} value={inlineTopic} onChange={e => setInlineTopic(e.target.value)}
+                placeholder="새 주제 입력 후 추가" onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addInlineTopic() } }} />
+              <button className={s.confirmBtn} style={{ flex: 'none', padding: '0 16px' }} onClick={addInlineTopic}>+ 주제</button>
+            </div>
+            <div style={{ fontSize: '12px', color: 'var(--text2)', margin: '8px 0 6px' }}>성경 (선택)</div>
             <select className={s.sheetInput} value={newBook} onChange={e => setNewBook(e.target.value)}>
               <option value="">선택 안 함</option>
               <optgroup label="구약">{OT.map(b => <option key={b} value={b}>{b}</option>)}</optgroup>
