@@ -127,7 +127,65 @@ export default function FamilyWorship() {
     } catch (e) { /* 사용자가 공유 취소 */ }
   }
 
-  const printRecord = (r) => {
+  // 예배지를 이미지(PNG)로 렌더 — iOS 공유 시트의 "프린트"로 출력하기 위함
+  const renderWorshipImage = async (r) => {
+    const scale = Math.min(window.devicePixelRatio || 1, 3)
+    const W = 820, pad = 48, contentW = W - pad * 2
+    const canvas = document.createElement('canvas')
+    const ctx = canvas.getContext('2d')
+    const FONT = (w, sz) => w + ' ' + sz + 'px -apple-system, "Apple SD Gothic Neo", sans-serif'
+    const wrap = (text, font) => {
+      ctx.font = font
+      const out = []
+      String(text).split('\n').forEach(para => {
+        if (!para) { out.push(''); return }
+        let cur = ''
+        for (const ch of para) {
+          if (ctx.measureText(cur + ch).width > contentW && cur) { out.push(cur); cur = ch }
+          else cur += ch
+        }
+        out.push(cur)
+      })
+      return out
+    }
+    const blocks = []
+    blocks.push({ lines: ['🏠 가정예배'], font: FONT('700', 34), lh: 46, color: '#001f3f', mt: 0 })
+    blocks.push({ lines: wrap(r.date + (r.ref ? ' · 본문: ' + r.ref : ''), FONT('400', 20)), font: FONT('400', 20), lh: 30, color: '#777', mt: 8 })
+    SECTIONS.forEach(sec => {
+      if (!r[sec.key]) return
+      blocks.push({ lines: [sec.label], font: FONT('700', 23), lh: 34, color: '#001f3f', mt: 26 })
+      blocks.push({ lines: wrap(r[sec.key], FONT('400', 22)), font: FONT('400', 22), lh: 34, color: '#222', mt: 4 })
+    })
+    let y = pad
+    blocks.forEach(b => { y += b.mt + b.lines.length * b.lh })
+    const H = y + pad
+    canvas.width = Math.round(W * scale)
+    canvas.height = Math.round(H * scale)
+    ctx.scale(scale, scale)
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H)
+    ctx.textBaseline = 'top'
+    y = pad
+    blocks.forEach(b => {
+      y += b.mt
+      ctx.font = b.font; ctx.fillStyle = b.color
+      b.lines.forEach(line => { ctx.fillText(line, pad, y); y += b.lh })
+    })
+    const blob = await new Promise(res => canvas.toBlob(res, 'image/png'))
+    return blob ? new File([blob], '가정예배_' + r.date + '.png', { type: 'image/png' }) : null
+  }
+
+  const printRecord = async (r) => {
+    // iOS 설치형 앱 등: 공유 시트에 이미지 → "프린트" 선택이 가장 확실
+    try {
+      const file = await renderWorshipImage(r)
+      if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+        try { await navigator.share({ files: [file], title: '가정예배 ' + r.date }) }
+        catch (e) { /* 사용자가 취소 */ }
+        return
+      }
+    } catch (e) { /* 이미지 생성 실패 시 아래 인쇄창으로 폴백 */ }
+
+    // 폴백: 데스크탑/Safari 등 — 인쇄 창
     const w = window.open('', '_blank')
     if (!w) { alert('팝업이 차단되어 있어요. 팝업을 허용해주세요.'); return }
     const body = SECTIONS.map(sec => {
